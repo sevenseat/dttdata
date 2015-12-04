@@ -4,11 +4,11 @@
 var GoogleSpreadsheet = require('google-spreadsheet');
 var Firebase = require('firebase');
 
-const tsPath = './node_modules/jstrueskill/lib/racingjellyfish/jstrueskill';
-var TrueSkillCalculator = require(`${tsPath}/TrueSkillCalculator`);
-var GameInfo = require(`${tsPath}/GameInfo`);
-var Player = require(`${tsPath}/Player`);
-var Team = require(`${tsPath}/Team`);
+const TS_PATH = './node_modules/jstrueskill/lib/racingjellyfish/jstrueskill';
+var TrueSkillCalculator = require(`${TS_PATH}/TrueSkillCalculator`);
+var GameInfo = require(`${TS_PATH}/GameInfo`);
+var Player = require(`${TS_PATH}/Player`);
+var Team = require(`${TS_PATH}/Team`);
 
 // spreadsheet key is the long id in the sheets URL
 var sheet = new GoogleSpreadsheet('1LI4OBEGMPKxBwtGY_xJ1yT_G-rrCJxl8FaC0q0DaBl0');
