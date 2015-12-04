@@ -1,0 +1,117 @@
+<link rel="import" href="bower_components/polymer/polymer.html">
+
+<dom-module id="participant-card">
+  <template>
+    <style>
+      :host {
+        display: block:
+      }
+      paper-dialog {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-width: 100%;
+        width: 600px;
+        margin: 0 auto;
+        overflow: initial !important; /* override paper-dialog */
+      }
+      paper-dialog paper-fab {
+        margin: 0;
+        position: absolute;
+        right: 16px;
+        top: calc(-56px / 2);
+        --paper-fab-background: var(--paper-green-500);
+        --paper-fab-keyboard-focus-background: var(--paper-green-700);
+      }
+      #card-title {
+        margin-left: calc(56px); /* icon width*/
+      }
+      #card-title h2 {
+        @apply(--paper-font-headline);
+        margin-bottom: 8px;
+      }
+      iron-icon[item-icon] {
+        opacity: var(--dark-secondary-opacity);
+      }
+    </style>
+
+    <paper-dialog id="dialog"
+        entry-animation="slide-up-and-fade-animation"
+        exit-animation="slide-down-and-fade-animation" on-click="_eatClick">
+      <header id="card-title">
+        <h2>[[participant.name.firstname]] [[participant.name.lastname]]</h2>
+      </header>
+
+      <paper-fab icon="maps:directions-car" on-tap="_showDirections"></paper-fab>
+
+      <paper-icon-item>
+        <iron-icon icon="maps:place" item-icon></iron-icon>
+        <span>{{marker.formatted_address}}</span>
+      </paper-icon-item>
+      <paper-icon-item>
+        <iron-icon icon="communication:phone" item-icon></iron-icon>
+        <span>{{marker.formatted_phone_number}}</span>
+      </paper-icon-item>
+      <paper-icon-item class="layout horizontal start"
+          hidden$="{{!marker.opening_hours.weekday_text.length}}">
+        <iron-icon icon="device:access-time" item-icon></iron-icon>
+        <div class="layout vertical">
+          <template is="dom-repeat"
+                    items="{{marker.opening_hours.weekday_text}}" as="day">
+            <div>{{day}}</div>
+          </template>
+        </div>
+      </paper-icon-item>
+
+
+    </paper-dialog>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'participant-card',
+      properties: {
+        marker: {
+          type: Object,
+          value: function() { return {}; }
+          //notify: true
+        },
+        dismissOnOutsideClick: {
+          type: Boolean,
+          value: true,
+          observer: '_onDismissOnClickOutsideChanged'
+        }
+      },
+      open: function() {
+        this.$.dialog.animationConfig = {
+          entry: {
+            name: 'transform-animation',
+            node: this.$.dialog,
+            transformFrom: 'translateY(calc(100% + 56px/2))',
+            transformTo: 'translateY(0)'
+          },
+          exit: {
+            name: 'transform-animation',
+            node: this.$.dialog,
+            transformFrom: 'translateY(0)',
+            transformTo: 'translateY(calc(100% + 56px/2))'
+          }
+        };
+        this.$.dialog.open();
+      },
+      close: function() {
+        this.$.dialog.close();
+      },
+      _showDirections: function() {
+        this.fire('show-directions');
+      },
+      _onDismissOnClickOutsideChanged: function() {
+        this.$.dialog.noCancelOnOutsideClick = this.dismissOnOutsideClick;
+      },
+      _eatClick: function(e) {
+        e.stopPropagation();
+      }
+    });
+  </script>
+</dom-module>

@@ -1,0 +1,114 @@
+<link rel="import" href="../bower_components/polymer/polymer.html">
+
+<dom-module id="race-table">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+
+    <div>
+      <paper-dropdown-menu label="Select Race">
+        <paper-menu class="dropdown-content" selected="{{_raceKey}}" attr-for-selected="key">
+          <template is="dom-repeat" items="[[_getRaces(dttData.races)]]">
+            <paper-item key="[[item]]">[[item]]</paper-item>
+          </template>
+        </paper-menu>
+      </paper-dropdown-menu>
+    </div>
+
+    <paper-datatable data="[[_raceData]]">
+      <paper-datatable-column header="Id" property="driverId" type="Number" align="right" sortable sorted
+                              tooltip="Used for Debugging">
+      </paper-datatable-column>
+
+      <paper-datatable-column header="Driver" property="driverName" type="String" style="width:99%;" sortable></paper-datatable-column>
+
+      <paper-datatable-column header="Navigator" property="navigatorName" type="String" sortable></paper-datatable-column>
+
+      <paper-datatable-column header="Start Time" property="leg1Start" type="Date" sortable>
+        <template><span>[[_getTimeStr(value)]]</span></template>
+      </paper-datatable-column>
+
+      <paper-datatable-column header="Checkpoint 1 In" property="leg1End" type="Date" align="right" sortable>
+        <template><span>[[_getTimeStr(value)]]</span></template>
+      </paper-datatable-column>
+
+      <paper-datatable-column header="Leg 1 Time" property="leg1Time" type="Date" align="right" sortable>
+        <template><span>[[_getTimeStr(value)]]</span></template>
+      </paper-datatable-column>
+
+      <paper-datatable-column header="Leg 1 Rank" property="leg1Rank" type="Number" align="right" sortable></paper-datatable-column>
+
+     </paper-datatable>
+  </template>
+  <script>
+  (function() {
+    'use strict';
+
+    Polymer({
+      is: 'race-table',
+
+      properties: {
+        dttData: {
+          type: Object
+        },
+        _raceData: {
+          type: Array,
+          computed: '_getRaceData(dttData, _raceKey)'
+        },
+        _raceKey: {
+          type: String,
+          value: '2015 ROF'
+        }
+      },
+
+      _getRaceData() {
+        console.time('Race Data');
+
+        let results = this.dttData.results.filter((result) => {
+          return (result.raceId === this._raceKey) && (result.leg === 3);
+        })
+        .sort((a, b) => {
+          if (a.dnf) {
+            if (b.dnf) { return 0;
+            } else { return 1; }
+          } else if (b.dnf) { return -1; }
+
+          return a.legTime - b.legTime;
+        })
+        .map((result, index) => {
+          //TODO: fix this timezone hack
+          let raceDate = new Date(this.dttData.races[result.raceId].date * 1000 +
+            4 * 60 * 60 * 1000);
+          console.log(`raceDate: ${raceDate.toLocaleString()}`);
+          return {
+            driverId: result.driverId,
+            driverName: this.dttData.participants[result.driverId].name.lastname +
+                    ', ' + this.dttData.participants[result.driverId].name.firstname,
+            navigatorName: 'tbd',
+            leg1Start: new Date(raceDate.getTime() + result.startTime * 1000),
+            leg1End: new Date(raceDate.getTime() + result.endTime * 1000),
+            leg1Time: new Date(raceDate.getTime() + result.legTime * 1000),
+            leg1Rank: index + 1
+          };
+        });
+
+        console.timeEnd('Race Data');
+        return results;
+      },
+
+      _getTimeStr(date) {
+        console.log(typeof date);
+        return date.toLocaleTimeString('en-US', {hour12: false});
+      },
+
+      _getRaces(races) {
+        return Object.keys(races);
+      }
+
+    });
+  })();
+  </script>
+</dom-module>
