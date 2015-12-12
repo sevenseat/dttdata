@@ -23,6 +23,7 @@ var glob = require('glob-all');
 var historyApiFallback = require('connect-history-api-fallback');
 var packageJson = require('./package.json');
 var crypto = require('crypto');
+var ensureFiles = require('./tasks/ensure-files.js');
 // var ghPages = require('gulp-gh-pages');
 
 var AUTOPREFIXER_BROWSERS = [
@@ -67,12 +68,10 @@ var imageOptimizeTask = function(src, dest) {
 
 var optimizeHtmlTask = function(src, dest) {
   var assets = $.useref.assets({
-    searchPath: ['.tmp', 'app', dist()]
+    searchPath: ['.tmp', 'app']
   });
 
   return gulp.src(src)
-    // Replace path for vulcanized assets
-    .pipe($.if('*.html', $.replace('elements/elements.html', 'elements/elements.vulcanized.html')))
     .pipe(assets)
     // Concatenate and minify JavaScript
     .pipe($.if('*.js', $.uglify({
@@ -105,8 +104,19 @@ gulp.task('elements', function() {
   return styleTask('elements', ['**/*.css']);
 });
 
+// Ensure that we are not missing required files for the project
+// "dot" files are specifically tricky due to them being hidden on
+// some systems.
+gulp.task('ensureFiles', function(cb) {
+  var requiredFiles = ['.jscsrc', '.jshintrc', '.bowerrc'];
+
+  ensureFiles(requiredFiles.map(function(p) {
+    return path.join(__dirname, p);
+  }), cb);
+});
+
 // Lint JavaScript
-gulp.task('lint', function() {
+gulp.task('lint', ['ensureFiles'], function() {
   return gulp.src([
       'app/scripts/**/*.js',
       'app/elements/**/*.js',
@@ -137,32 +147,20 @@ gulp.task('copy', function() {
   var app = gulp.src([
     'app/*',
     '!app/test',
+    '!app/elements',
+    '!app/bower_components',
     '!app/cache-config.json'
   ], {
     dot: true
   }).pipe(gulp.dest(dist()));
 
+  // Copy over only the bower_components we need
+  // These are things which cannot be vulcanized
   var bower = gulp.src([
-    'bower_components/**/*'
+    'app/bower_components/{webcomponentsjs,platinum-sw,sw-toolbox,promise-polyfill}/**/*'
   ]).pipe(gulp.dest(dist('bower_components')));
 
-  var elements = gulp.src(['app/elements/**/*.html',
-      'app/elements/**/*.css',
-      'app/elements/**/*.js'
-    ])
-    .pipe(gulp.dest(dist('elements')));
-
-  var swBootstrap = gulp.src(['bower_components/platinum-sw/bootstrap/*.js'])
-    .pipe(gulp.dest(dist('elements/bootstrap')));
-
-  var swToolbox = gulp.src(['bower_components/sw-toolbox/*.js'])
-    .pipe(gulp.dest(dist('sw-toolbox')));
-
-  var vulcanized = gulp.src(['app/elements/elements.html'])
-    .pipe($.rename('elements.vulcanized.html'))
-    .pipe(gulp.dest(dist('elements')));
-
-  return merge(app, bower, elements, vulcanized, swBootstrap, swToolbox)
+  return merge(app, bower)
     .pipe($.size({
       title: 'copy'
     }));
@@ -180,21 +178,19 @@ gulp.task('fonts', function() {
 // Scan your HTML for assets & optimize them
 gulp.task('html', function() {
   return optimizeHtmlTask(
-    ['app/**/*.html', '!app/{elements,test}/**/*.html'],
+    ['app/**/*.html', '!app/{elements,test,bower_components}/**/*.html'],
     dist());
 });
 
 // Vulcanize granular configuration
 gulp.task('vulcanize', function() {
-  var DEST_DIR = dist('elements');
-  return gulp.src(dist('elements/elements.vulcanized.html'))
+  return gulp.src('app/elements/elements.html')
     .pipe($.vulcanize({
       stripComments: true,
       inlineCss: true,
       inlineScripts: true
     }))
-    .pipe($.minifyInline())
-    .pipe(gulp.dest(DEST_DIR))
+    .pipe(gulp.dest(dist('elements')))
     .pipe($.size({title: 'vulcanize'}));
 });
 
@@ -258,10 +254,7 @@ gulp.task('serve', ['lint', 'styles', 'elements', 'images'], function() {
     // https: true,
     server: {
       baseDir: ['.tmp', 'app'],
-      middleware: [historyApiFallback()],
-      routes: {
-        '/bower_components': 'bower_components'
-      }
+      middleware: [historyApiFallback()]
     }
   });
 
@@ -317,7 +310,13 @@ gulp.task('build-deploy-gh-pages', function(cb) {
 // Deploy to GitHub pages gh-pages branch
 gulp.task('deploy-gh-pages', function() {
   return gulp.src(dist('**/*'))
-    .pipe($.ghPages());
+    // Check if running task from Travis CI, if so run using GH_TOKEN
+    // otherwise run using ghPages defaults.
+    .pipe($.if(process.env.TRAVIS === 'true', $.ghPages({
+      remoteUrl: 'https://$GH_TOKEN@github.com/polymerelements/polymer-starter-kit.git',
+      silent: true,
+      branch: 'gh-pages'
+    }), $.ghPages()));
 });
 
 // Load tasks for web-component-tester

@@ -50,9 +50,9 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
   <script src="bower_components/webcomponentsjs/webcomponents-lite.js"></script>
   <!-- endbuild -->
 
-  <!-- will be replaced with elements/elements.vulcanized.html -->
+  <!-- Because this project uses vulcanize this should be your only html import
+       in this file. All other imports should go in elements.html -->
   <link rel="import" href="elements/elements.html">
-  <!-- endreplace-->
 
   <!-- For shared styles, shared-styles.html import in elements.html -->
   <style is="custom-style" include="shared-styles"></style>
@@ -83,17 +83,17 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
             <span>Home</span>
           </a>
 
-          <a data-route="race" href="races">
+          <a data-route="race" href="{{baseUrl}}races">
             <iron-icon icon="maps:place"></iron-icon>
             <span>Races</span>
           </a>
 
-          <a data-route="drivers" href="drivers">
+          <a data-route="drivers" href="{{baseUrl}}drivers">
             <iron-icon icon="maps:directions-car"></iron-icon>
             <span>Drivers</span>
           </a>
 
-          <a data-route="navigators" href="navigators">
+          <a data-route="navigators" href="{{baseUrl}}navigators">
             <iron-icon icon="maps:maps:navigation"></iron-icon>
             <span>Navigators</span>
           </a>
@@ -185,6 +185,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
     <platinum-sw-register auto-register
                           clients-claim
                           skip-waiting
+                          base-uri="bower_components/platinum-sw/bootstrap"
                           on-service-worker-installed="displayInstalledToast">
       <platinum-sw-cache default-cache-strategy="fastest"
                          cache-config-file="cache-config.json">
