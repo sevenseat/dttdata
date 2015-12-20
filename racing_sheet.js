@@ -46,25 +46,6 @@ function getParticipantMap(rows) {
   return participantMap;
 }
 
-//Results
-function getResults(rows) {
-  let resultSet = new Set();
-  for (let row of rows) {
-    resultSet.add({
-      raceId: row.raceid,
-      leg: Number.parseInt(row.leg),
-      driverId: Number.parseInt(row.driverid),
-      navigatorId: 'n/a',
-      startTime: Moment.duration(row.starttime),
-      endTime: Moment.duration(row.finishtime),
-      legTime: Moment.duration(row.legduration),
-      dnf: row.dnf === 'TRUE' ? true : false,
-      unknownTime: row.unknown === 'TRUE' ? true : false
-    });
-  }
-  return Array.from(resultSet.values());
-}
-
 //Races
 function getRaceMap(rows) {
   let raceMap = new Map();
@@ -86,9 +67,23 @@ function getRaceMap(rows) {
   return raceMap;
 }
 
-function buildRaceTables(participantMap, raceMap, results) {
+function buildRaceTables(rows, participantMap, raceMap) {
 
   let raceTables = new Map();
+
+  let results = rows.map((row) => {
+    return {
+      raceId: row.raceid,
+      leg: Number.parseInt(row.leg),
+      driverId: Number.parseInt(row.driverid),
+      navigatorId: 'n/a',
+      startTime: Moment.duration(row.starttime),
+      endTime: Moment.duration(row.finishtime),
+      legTime: Moment.duration(row.legduration),
+      dnf: row.dnf === 'TRUE' ? true : false,
+      unknownTime: row.unknown === 'TRUE' ? true : false
+    };
+  });
 
   for (let race of raceMap.values()) {
     //TODO: fix this timezone hack
@@ -160,13 +155,13 @@ function scoreLeg(results, participantMap) {
 console.log('Getting data from Google Sheets');
 Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
              getSheetRows(Sheet, 3).then(getRaceMap),
-             getSheetRows(Sheet, 2).then(getResults)
+             getSheetRows(Sheet, 2)
            ])
 .then((promiseResults) => {
   console.log('Data from sheets pulled');
   let participantMap = promiseResults[0];
   let raceMap = promiseResults[1];
-  let results = promiseResults[2];
+  let results = buildRaceTables(promiseResults[2], participantMap, raceMap);
 
   //Iterate throught he races
   for (let race of raceMap.values()) {
