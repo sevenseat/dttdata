@@ -29,8 +29,7 @@ function getSheetRows(sheet, tab) {
 
 //Participants
 function getParticipantMap(rows) {
-  let participantMap = new Map();
-  for (let row of rows) {
+  return rows.reduce((participantMap, row) => {
     let participantId = Number.parseInt(row.participantid);
     let fullname = `${row.last}, ${row.first}`;
     // if (row.nickname.length > 0) {fullname += ` (${row.nickname})`;}
@@ -42,26 +41,27 @@ function getParticipantMap(rows) {
         nickname: row.nickname,
       },
     });
-  }
-  return participantMap;
+    return participantMap;
+  }, new Map());
 }
 
 //Races
 function getRaceMap(rows) {
-  let raceMap = new Map();
-  for (let row of rows) {
+  return rows.reduce((raceMap, row) => {
     raceMap.set(row.raceid, {
       raceId: row.raceid,
-      name: row.racename,
+      name: `${row.year} ${row.racename}`,
       abbreviation: row.raceabbr,
-      date: Moment.tz(row.date, 'MM/DD/YYYY', 'America/New_York').toJSON(),
+      date: Moment.tz(row.date, 'MM/DD/YYYY', 'America/New_York').toDate(),
       numLegs: Number.parseInt(row.numlegs),
       legs: [],
-      legMedianTimes: [],
-      toScore: row.toscore === 'TRUE' ? true : false
+      toScore: row.toscore === 'TRUE' ? true : false,
+      start: row.start,
+      finish: row.finish,
+      distance: row.distance
     });
-  }
-  return raceMap;
+    return raceMap;
+  }, new Map());
 }
 
 function getLegResults(rows, raceMap) {
@@ -275,11 +275,11 @@ function getRaceList(raceResults, raceMap) {
     let result = raceResults[raceId];
     return {
       raceId: raceId,
-      name: `${new Date(raceMap.get(raceId).date).getFullYear()} ${raceMap.get(raceId).name}`,
-      date: raceMap.get(raceId).date,
-      start: 'TBD',
-      end: 'TBD',
-      distance: 'TBD',
+      name: raceMap.get(raceId).name,
+      date: raceMap.get(raceId).date.toJSON(),
+      start: raceMap.get(raceId).start,
+      end: raceMap.get(raceId).finish,
+      distance: raceMap.get(raceId).distance,
       time: result[0].duration,
       winner: result[0].driverName
     };
@@ -295,8 +295,8 @@ function getDriverStats(raceResults, participantMap) {
   let stats = Object.keys(raceResults).map(key => {return raceResults[key];})
   .reduce((drivers, curRace) => {
     curRace.forEach(driver => {
-      if (!drivers.hasOwnProperty(driver.driverId)) {
-        drivers[driver.driverId] = {
+      if (!drivers.has(driver.driverId)) {
+        drivers.set(driver.driverId, {
           id: driver.driverId,
           name: participantMap.get(driver.driverId).fullname,
           starts: 0,
@@ -304,16 +304,18 @@ function getDriverStats(raceResults, participantMap) {
           wins: 0,
           podiums: 0,
           skillRanking: null
-        };
+        });
       }
-      drivers[driver.driverId].starts++;
-      if (!driver.dnf) {drivers[driver.driverId].finishes++;}
-      if (driver.rank === 1) {drivers[driver.driverId].wins++;}
-      if (driver.rank <= 3) {drivers[driver.driverId].podiums++;}
+
+      let thisDriver = drivers.get(driver.driverId);
+      thisDriver.starts++;
+      if (!driver.dnf) {thisDriver.finishes++;}
+      if (driver.rank === 1) {thisDriver.wins++;}
+      if (driver.rank <= 3) {thisDriver.podiums++;}
     });
     return drivers;
-  }, {});
-  return Object.keys(stats).map(key => stats[key]);
+  }, new Map());
+  return Array.from(stats.values());
 }
 
 function main() {
