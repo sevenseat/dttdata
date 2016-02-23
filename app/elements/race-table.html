@@ -1,5 +1,8 @@
 <link rel="import" href="../bower_components/polymer/polymer.html">
 
+<link rel="import" href="../bower_components/firebase-element/firebase-document.html">
+<link rel="import" href="../bower_components/vaadin-grid/vaadin-grid.html">
+
 <dom-module id="race-table">
   <template>
     <style>
@@ -8,40 +11,22 @@
       }
     </style>
 
-    <div>
-      <paper-dropdown-menu label="Select Race">
-        <paper-menu class="dropdown-content" selected="{{_raceKey}}" attr-for-selected="key">
-          <template is="dom-repeat" items="[[_getRaces(dttData.races)]]">
-            <paper-item key="[[item]]">[[item]]</paper-item>
-          </template>
-        </paper-menu>
-      </paper-dropdown-menu>
-    </div>
+    <firebase-document
+      location="https://dttdata.firebaseio.com/races"
+      data="{{_rows}}"></firebase-document>
 
-    <paper-datatable data="[[_raceData]]">
-      <paper-datatable-column header="Id" property="driverId" type="Number" align="right" sortable sorted
-                              tooltip="Used for Debugging">
-      </paper-datatable-column>
-
-      <paper-datatable-column header="Driver" property="driverName" type="String" style="width:99%;" sortable></paper-datatable-column>
-
-      <paper-datatable-column header="Navigator" property="navigatorName" type="String" sortable></paper-datatable-column>
-
-      <paper-datatable-column header="Start Time" property="leg1Start" type="Date" sortable>
-        <template><span>[[_getTimeStr(value)]]</span></template>
-      </paper-datatable-column>
-
-      <paper-datatable-column header="Checkpoint 1 In" property="leg1End" type="Date" align="right" sortable>
-        <template><span>[[_getTimeStr(value)]]</span></template>
-      </paper-datatable-column>
-
-      <paper-datatable-column header="Leg 1 Time" property="leg1Time" type="Date" align="right" sortable>
-        <template><span>[[_getTimeStr(value)]]</span></template>
-      </paper-datatable-column>
-
-      <paper-datatable-column header="Leg 1 Rank" property="leg1Rank" type="Number" align="right" sortable></paper-datatable-column>
-
-     </paper-datatable>
+    <vaadin-grid id="grid" items="[[_rows]]">
+      <table>
+        <colgroup>
+          <col name="raceId" sortable>
+          <col name="date" sortable>
+          <col name="start" sortable>
+          <col name="end" sortable>
+          <col name="distance" sortable>
+          <col name="winner" sortable flex>
+        </colgroup>
+      </table>
+    </vaadin-grid>
   </template>
   <script>
   (function() {
@@ -51,59 +36,26 @@
       is: 'race-table',
 
       properties: {
-        dttData: {
-          type: Object
-        },
-        _raceData: {
-          type: Array,
-          computed: '_getRaceData(dttData, _raceKey)'
-        },
-        _raceKey: {
-          type: String,
-          value: '2015 ROF'
-        }
+        _rows: Array
       },
 
-      _getRaceData() {
-        console.time('Race Data');
+      ready() {
+        let grid = this.$.grid;
 
-        let results = this.dttData.results.filter((result) => {
-          return (result.raceId === this._raceKey) && (result.leg === 3);
-        })
-        .sort((a, b) => {
-          if (a.dnf) { return b.dnf ? 0 : 1; }
-          if (b.dnf) { return -1; }
-          return a.legTime - b.legTime;
-        })
-        .map((result, index) => {
-          //TODO: fix this timezone hack
-          let raceDate = new Date(this.dttData.races[result.raceId].date * 1000 +
-            4 * 60 * 60 * 1000);
-          console.log(`raceDate: ${raceDate.toLocaleString()}`);
-          return {
-            driverId: result.driverId,
-            driverName: this.dttData.participants[result.driverId].name.lastname +
-                    ', ' + this.dttData.participants[result.driverId].name.firstname,
-            navigatorName: 'tbd',
-            leg1Start: new Date(raceDate.getTime() + result.startTime * 1000),
-            leg1End: new Date(raceDate.getTime() + result.endTime * 1000),
-            leg1Time: new Date(raceDate.getTime() + result.legTime * 1000),
-            leg1Rank: index + 1
-          };
+        grid.columns[1].renderer = (cell) => {
+          cell.element.innerHTML = new Date(cell.data).toLocaleDateString();
+        };
+
+        //Sorting logic
+        grid.addEventListener('sort-order-changed', () => {
+          var key = grid.columns[grid.sortOrder[0].column].name;
+          var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+          this._rows.sort(function(a, b) {
+            return (a[key] < b[key]) ? lesser : -lesser;
+          });
         });
 
-        console.timeEnd('Race Data');
-        return results;
       },
-
-      _getTimeStr(date) {
-        console.log(typeof date);
-        return date.toLocaleTimeString('en-US', {hour12: false});
-      },
-
-      _getRaces(races) {
-        return Object.keys(races);
-      }
 
     });
   })();

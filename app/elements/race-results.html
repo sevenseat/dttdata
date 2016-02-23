@@ -1,0 +1,100 @@
+<link rel="import" href="../bower_components/polymer/polymer.html">
+
+<link rel="import" href="../bower_components/firebase-element/firebase-document.html">
+<link rel="import" href="../bower_components/vaadin-grid/vaadin-grid.html">
+
+<script src="../bower_components/moment/moment.js"></script>
+<script src="../bower_components/moment-duration-format/lib/moment-duration-format.js"></script>
+
+<dom-module id="race-results">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+
+    <firebase-document
+      location="https://dttdata.firebaseio.com/raceResults/2015%20ROF"
+      data="{{_rows}}"></firebase-document>
+
+    <vaadin-grid id="grid" items="[[_rows]]">
+        <!-- Declared Imperitively within Ready function -->
+    </vaadin-grid>
+  </template>
+  <script>
+  (function() {
+    'use strict';
+
+    Polymer({
+      is: 'race-results',
+
+      properties: {
+        _rows: Array,
+        _legs: {
+          type: Array,
+          value: [1, 2, 3]
+        }
+      },
+
+      ready() {
+        let grid = this.$.grid;
+
+        // Set the columns impertively
+        let columns = [
+          {name: 'driverName', sortable: true},
+          {name: 'navigatorName', sortable: true}
+        ];
+        let header1 = ['',''];
+        let header2 = ['Driver', 'Navigator'];
+        this._legs.forEach(leg => {
+          columns = columns.concat([
+            {name: `legs.${leg}.start`, sortable: true},
+            {name: `legs.${leg}.end`, sortable: true},
+            {name: `legs.${leg}.duration`, sortable: true}
+          ]);
+          header1 = header1.concat([`Leg ${leg}`, '', '']);
+          header2 = header2.concat(['Start', 'End', 'Duration']);
+        });
+
+        // Add the total column
+        columns.push({name: `duration`, sortable: true});
+        columns.push({name: `rank`, sortable: true});
+        header2.push('Total');
+        header2.push('Rank');
+
+        grid.columns = columns;
+        for (let i = 2; i < 2 + (3 * this._legs.length); i += 3) {
+          grid.columns[i].renderer = this._timeRenderer;
+          grid.columns[i + 1].renderer = this._timeRenderer;
+          grid.columns[i + 2].renderer = this._durationRenderer;
+        }
+        //set the renderer for the total time
+        grid.columns[grid.columns.length - 2].renderer = this._durationRenderer;
+
+        grid.header.addRow(1, header1);
+        grid.header.addRow(2, header2);
+        grid.header.removeRow(0);
+
+        //Sorting logic
+        grid.addEventListener('sort-order-changed', () => {
+          var key = grid.columns[grid.sortOrder[0].column].name;
+          var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+          this._rows.sort(function(a, b) {
+            return (a[key] < b[key]) ? lesser : -lesser;
+          });
+        });
+      },
+
+      _timeRenderer(cell) {
+        cell.element.innerHTML = new Date(cell.data).toLocaleTimeString('en-US', {hour12: false});
+      },
+
+      _durationRenderer(cell) {
+        cell.element.innerHTML = moment.duration(cell.data).format('h:mm:ss', {trim: false});
+      }
+
+    });
+  })();
+  </script>
+</dom-module>

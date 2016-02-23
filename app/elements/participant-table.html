@@ -1,5 +1,8 @@
 <link rel="import" href="../bower_components/polymer/polymer.html">
 
+<link rel="import" href="../bower_components/firebase-element/firebase-document.html">
+<link rel="import" href="../bower_components/vaadin-grid/vaadin-grid.html">
+
 <dom-module id="participant-table">
   <template>
     <style>
@@ -7,33 +10,25 @@
         display: block;
       }
     </style>
-    <paper-datatable data="[[_participantData]]">
-      <paper-datatable-column header="Id" property="participantId" type="Number" align="right" sortable sorted
-                              tooltip="Used for Debugging">
-      </paper-datatable-column>
 
-      <paper-datatable-column header="Name" property="name" type="String" style="width:99%;" sortable></paper-datatable-column>
+    <firebase-document
+      location="https://dttdata.firebaseio.com/driverStats"
+      data="{{_rows}}"></firebase-document>
 
-      <paper-datatable-column header="Races" property="numRaces" type="Number" align="right" sortable></paper-datatable-column>
+    <vaadin-grid id="grid" items="[[_rows]]">
+      <table>
+        <colgroup>
+          <col name="id" sortable>
+          <col name="name" sortable flex>
+          <col name="starts" sortable>
+          <col name="finishes" sortable>
+          <col name="wins" sortable>
+          <col name="podiums" sortable>
+          <col name="skillRating" sortable>
+        </colgroup>
+      </table>
+    </vaadin-grid>
 
-      <paper-datatable-column header="Finishes" property="numFinishes" type="Number" align="right" sortable>
-          <template><span>[[value]]&nbsp;([[item.finishPercentage]]%)<span></template>
-      </paper-datatable-column>
-
-      <paper-datatable-column header="Wins" property="numWins" type="Number" align="right" sortable></paper-datatable-column>
-
-      <paper-datatable-column header="Podium Finishes" property="numPodiums" type="Number" align="right" sortable></paper-datatable-column>
-
-      <paper-datatable-column header="Time vs. Median" property="timeVsMedian" type="Number" align="right" sortable
-                              tooltip="How a player compares to the median time in the legs they raced.  Smaller is better" >
-                              <template><span>[[value]]%<span></template>
-      </paper-datatable-column>
-
-      <paper-datatable-column header="Skill Rating" property="currentSkillRating" type="Number" align="right" sortable
-                              tooltip="The Conservative Rating of the player">
-      </paper-datatable-column>
-
-     </paper-datatable>
   </template>
   <script>
   (function() {
@@ -43,71 +38,22 @@
       is: 'participant-table',
 
       properties: {
-        dttData: {
-          type: Object
-        },
-        _participantData: {
-          type: Array,
-          computed: '_getParticipantData(dttData)'
-        }
+        _rows: Array,
+
       },
 
-      _getParticipantData() {
-        console.time('Participant Data');
-        let participants = this.dttData.participants.map((participant) => {
-          let skill = participant.driverSkill;
-          let item = {
-            participantId: participant.participantId,
-            name: `${participant.name.lastname}, ${participant.name.firstname}`,
-            currentSkillMean: skill ? skill.mean.toFixed(2) : 'n/a',
-            currentSkillRating: skill ? skill.conservativeRating.toFixed(2) : 'n/a',
-            races: [],
-            numRaces: 0,
-            numFinishes: 0,
-            finishPercentage: 0,
-            _totalTime: 0,
-            _medianTime: 0,
-            timeVsMedian: 0
-          };
-          return item;
+      ready() {
+
+        let grid = this.$.grid;
+        grid.addEventListener('sort-order-changed', () => {
+          var key = grid.columns[grid.sortOrder[0].column].name;
+          var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+          this._rows.sort(function(a, b) {
+            return (a[key] < b[key]) ? lesser : -lesser;
+          });
         });
 
-        for (let result of this.dttData.results) {
-          let participant = participants[result.driverId];
-          if (typeof participant !== 'undefined') {
-            if (result.leg === 1) {
-              participant.numRaces++;
-            }
-            if ((result.dnf === false) && (result.unknownTime === false)) {
-              participant._totalTime += result.legTime;
-              participant._medianTime +=
-                      this.dttData.races[result.raceId].legMedianTimes[result.leg];
-              if (result.leg === this.dttData.races[result.raceId].legs) {
-                participant.numFinishes++;
-              }
-            }
-          }
-        }
-
-        for (let participant of participants) {
-          if (typeof participant !== 'undefined') {
-            participant.finishPercentage =
-                (participant.numFinishes / participant.numRaces * 100).toFixed(0);
-            if (participant._medianTime > 0) {
-              participant.timeVsMedian = (participant._totalTime /
-                                       participant._medianTime * 100).toFixed(1);
-            } else { participant.timeVsMedian = '';}
-          }
-        }
-
-        participants = participants.filter((participant) => {
-          return participant.numRaces > 0;
-        });
-
-        console.timeEnd('Participant Data');
-        return participants;
-      },
-
+      }
     });
   })();
   </script>
