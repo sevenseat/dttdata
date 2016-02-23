@@ -196,35 +196,13 @@ Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
   let raceMap = promiseResults[1];
   let legResults = getLegResults(promiseResults[2], raceMap);
 
-  let driverStats = legResults.reduce((drivers, curLeg) => {
-    if (!drivers.hasOwnProperty(curLeg.driverId)) {
-      drivers[curLeg.driverId] = {
-        id: curLeg.driverId,
-        name: participantMap.get(curLeg.driverId).fullname,
-        starts: 0,
-        finishes: 0,
-        wins: null,
-        podiums: null,
-        skillRanking: null
-      };
-    }
-    if (curLeg.leg === 1) {
-      drivers[curLeg.driverId].starts++;
-    }
-    if (curLeg.leg === raceMap.get(curLeg.raceId).numLegs) {
-      if (curLeg.dnf === false) {
-        drivers[curLeg.driverId].finishes++;
-      }
-    }
-    return drivers;
-  }, {});
-
   let raceResults = legResults.reduce((races, curLeg) => {
     if (!races.hasOwnProperty(curLeg.raceId)) {
       races[curLeg.raceId] = {};
     }
     if (!races[curLeg.raceId].hasOwnProperty(curLeg.driverId)) {
       races[curLeg.raceId][curLeg.driverId] = {
+        driverId: curLeg.driverId,
         driverName: participantMap.get(curLeg.driverId).fullname,
         navigatorName: 'n/a',
         duration: Moment.duration(0),
@@ -273,7 +251,28 @@ Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
     });
   });
 
-  console.log(JSON.stringify(raceResults['2015 ROF'], null, '\t'));
+  //calculate the driver stats
+  let driverStats = Object.keys(raceResults).map(key => {return raceResults[key];})
+  .reduce((drivers, curRace) => {
+    curRace.forEach(driver => {
+      if (!drivers.hasOwnProperty(driver.driverId)) {
+        drivers[driver.driverId] = {
+          id: driver.driverId,
+          name: participantMap.get(driver.driverId).fullname,
+          starts: 0,
+          finishes: 0,
+          wins: 0,
+          podiums: 0,
+          skillRanking: null
+        };
+      }
+      drivers[driver.driverId].starts++;
+      if (!driver.dnf) {drivers[driver.driverId].finishes++;}
+      if (driver.rank === 1) {drivers[driver.driverId].wins++;}
+      if (driver.rank <= 3) {drivers[driver.driverId].podiums++;}
+    });
+    return drivers;
+  }, {});
 
   // let results = buildRaceTables(promiseResults[2], participantMap, raceMap);
   //
