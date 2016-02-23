@@ -77,7 +77,8 @@ function getLegResults(rows, raceMap) {
       navigatorId: 'n/a',
       start: RACE_DATE.clone().add(Moment.duration(row.starttime)),
       end: RACE_DATE.clone().add(Moment.duration(row.finishtime)),
-      duration: Moment.duration(row.legduration),
+      duration: Moment.duration(row.dnf === 'TRUE' ? Number.MAX_VALUE : row.legduration),
+      rank: null, //placeholder
       dnf: row.dnf === 'TRUE' ? true : false,
       unknownTime: row.unknown === 'TRUE' ? true : false
     };
@@ -196,7 +197,35 @@ Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
   let raceMap = promiseResults[1];
   let legResults = getLegResults(promiseResults[2], raceMap);
 
-  let raceResults = legResults.reduce((races, curLeg) => {
+  let raceResults = legResults
+  //first get leg rankings by doing some cool sorting work
+  .sort((r1, r2) => {
+    if (r1.raceId !== r2.raceId) {
+      return r1.date - r2.date;
+    } else if (r1.leg !== r2.leg) {
+      return r1.leg - r2.leg;
+    }
+    return r1.duration - r2.duration;
+  })
+  .map((curResult, index, allResults) => {
+    let rank = 1;
+    if (index !== 0) {
+      let prevResult = allResults[index - 1];
+      if ((prevResult.raceId === curResult.raceId) && (prevResult.leg === curResult.leg)) {
+        //curResult is in the same leg
+        if (curResult.duration === prevResult.duration) {
+          rank = prevResult.rank;
+        }  else {
+          rank = prevResult.rank + 1;
+        }
+      }
+    }
+    curResult.rank = rank;
+    return curResult;
+  })
+
+  //then start to process it into a race result table
+  .reduce((races, curLeg) => {
     if (!races.hasOwnProperty(curLeg.raceId)) {
       races[curLeg.raceId] = {};
     }
@@ -215,6 +244,7 @@ Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
       start: curLeg.start,
       end: curLeg.end,
       duration: curLeg.duration,
+      rank: curLeg.rank,
       dnf: curLeg.dnf,
       unknownTime: curLeg.unknownTime
     };
