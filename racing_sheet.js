@@ -61,9 +61,6 @@ function getRaceMap(rows) {
       toScore: row.toscore === 'TRUE' ? true : false
     });
   }
-
-  console.log(JSON.stringify(Array.from(raceMap), null, '\t'));
-
   return raceMap;
 }
 
@@ -185,18 +182,7 @@ function getLegResults(rows, raceMap) {
 //
 // }
 
-// Main
-console.log('Getting data from Google Sheets');
-Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
-             getSheetRows(Sheet, 3).then(getRaceMap),
-             getSheetRows(Sheet, 2)
-           ])
-.then((promiseResults) => {
-  console.log('Data from sheets pulled');
-  let participantMap = promiseResults[0];
-  let raceMap = promiseResults[1];
-  let legResults = getLegResults(promiseResults[2], raceMap);
-
+function getRaceResults(legResults, participantMap) {
   let raceResults = legResults
   //first get leg rankings by doing some cool sorting work
   .sort((r1, r2) => {
@@ -280,9 +266,11 @@ Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
       return result;
     });
   });
+  return raceResults;
+}
 
-  //calculate the driver stats
-  let driverStats = Object.keys(raceResults).map(key => {return raceResults[key];})
+function getDriverStats(raceResults, participantMap) {
+  let stats = Object.keys(raceResults).map(key => {return raceResults[key];})
   .reduce((drivers, curRace) => {
     curRace.forEach(driver => {
       if (!drivers.hasOwnProperty(driver.driverId)) {
@@ -303,63 +291,51 @@ Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
     });
     return drivers;
   }, {});
+  return Object.keys(stats).map(key => stats[key]);
+}
 
-  // let results = buildRaceTables(promiseResults[2], participantMap, raceMap);
-  //
-  // //Iterate throught he races
-  // for (let race of raceMap.values()) {
-  //   if (race.toScore === true) {
-  //     for (let leg = 1; leg <= race.numLegs; leg++) { //using human numbers
-  //       let legResults = results.filter(result => {
-  //         return (result.raceId === race.raceId) && (result.leg === leg);
-  //       });
-  //       if (legResults.length > 0) {
-  //         console.log(`scoring ${race.raceId}: ${leg}`);
-  //         scoreLeg(legResults, participantMap);
-  //
-  //         raceMap.get(race.raceId).legs[leg] = legResults;
-  //
-  //         //calculate median leg times
-  //         let sortedLegTimes = legResults.filter(leg => {
-  //           return leg.dnf === false && leg.unknownTime === false;
-  //         })
-  //         .map(leg => {return leg.legTime;})
-  //         .sort((a, b) => {return a - b;});
-  //         let medianLegTime = (sortedLegTimes[Math.floor(sortedLegTimes.length / 2)] +
-  //                              sortedLegTimes[Math.ceil(sortedLegTimes.length / 2)]) / 2;
-  //         raceMap.get(race.raceId).legMedianTimes[leg] = medianLegTime;
-  //
-  //       }
-  //     }
-  //   }
-  // }
+function main() {
+  console.log('Getting data from Google Sheets');
+  Promise.all([getSheetRows(Sheet, 1).then(getParticipantMap),
+               getSheetRows(Sheet, 3).then(getRaceMap),
+               getSheetRows(Sheet, 2)
+             ])
+  .then((promiseResults) => {
+    console.log('Data from sheets pulled');
+    let participantMap = promiseResults[0];
+    let raceMap = promiseResults[1];
+    let legResults = getLegResults(promiseResults[2], raceMap);
 
-  console.log('Updating Firebase');
-  let fbRef = new Firebase('https://dttdata.firebaseio.com/');
-  fbRef.set({
-    races: Array.from(raceMap.values()),
-    raceResults: raceResults,
-    // participantMap: Array.from(participantMap.values()),
-    driverStats: Object.keys(driverStats).map(key => driverStats[key])
-    // raceTables: Array.from(buildRaceTables(participantMap, raceMap, results))
+    let raceResults = getRaceResults(legResults, participantMap);
+    let driverStats = getDriverStats(raceResults, participantMap);
+
+    console.log('Updating Firebase');
+    let fbRef = new Firebase('https://dttdata.firebaseio.com/');
+    fbRef.set({
+      races: Array.from(raceMap.values()),
+      raceResults: raceResults,
+      driverStats: driverStats
+    });
+
+    // //output the ranked list of drivers
+    // let rankedDrivers = Array.from(participantMap.values())
+    // .filter(a => { return typeof a.driverSkill !== 'undefined';})
+    // .sort((a,b) => {
+    //   return b.driverSkill.conservativeRating - a.driverSkill.conservativeRating;
+    // });
+    // rankedDrivers.forEach((driver,index) => {
+    //   console.log(`${index} ${driver.driverSkill.conservativeRating.toFixed(3)} ` +
+    //               `${driver.driverSkill.mean.toFixed(3)} ` +
+    //               `${driver.name.lastname}, ${driver.name.firstname}`);
+    // });
+    //
+    console.log('all done');
+  })
+  .catch(err => {
+    console.error(`ERROR: ${err}`);
+    console.error(err.stack);
+    throw err;
   });
+}
 
-  //output the ranked list of drivers
-  let rankedDrivers = Array.from(participantMap.values())
-  .filter(a => { return typeof a.driverSkill !== 'undefined';})
-  .sort((a,b) => {
-    return b.driverSkill.conservativeRating - a.driverSkill.conservativeRating;
-  });
-  rankedDrivers.forEach((driver,index) => {
-    console.log(`${index} ${driver.driverSkill.conservativeRating.toFixed(3)} ` +
-                `${driver.driverSkill.mean.toFixed(3)} ` +
-                `${driver.name.lastname}, ${driver.name.firstname}`);
-  });
-
-  console.log('all done');
-})
-.catch(err => {
-  console.error(`ERROR: ${err}`);
-  console.error(err.stack);
-  throw err;
-});
+main();
