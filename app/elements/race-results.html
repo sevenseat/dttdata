@@ -15,7 +15,7 @@
     </style>
 
     <firebase-document
-      location="https://dttdata.firebaseio.com/raceResults/2015%20ROF"
+      location="[[_getFirebaseUrl(raceId)]]"
       data="{{_rows}}"></firebase-document>
 
     <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1">
@@ -30,6 +30,7 @@
       is: 'race-results',
 
       properties: {
+        raceId: String,
         _rows: Array,
         _legs: {
           type: Array,
@@ -84,6 +85,10 @@
             return (a[key] < b[key]) ? lesser : -lesser;
           });
         });
+      },
+
+      _getFirebaseUrl() {
+        return `https://dttdata.firebaseio.com/raceResults/${encodeURIComponent(this.raceId)}`;
       },
 
       _timeRenderer(cell) {
