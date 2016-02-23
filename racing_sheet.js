@@ -33,7 +33,7 @@ function getParticipantMap(rows) {
   for (let row of rows) {
     let participantId = Number.parseInt(row.participantid);
     let fullname = `${row.last}, ${row.first}`;
-    if (row.nickname.length > 0) {fullname += ` (${row.nickname})`;}
+    // if (row.nickname.length > 0) {fullname += ` (${row.nickname})`;}
     participantMap.set(participantId, {
       fullname: fullname,
       name: {
@@ -269,6 +269,28 @@ function getRaceResults(legResults, participantMap) {
   return raceResults;
 }
 
+function getRaceList(raceResults, raceMap) {
+  let list = Object.keys(raceResults)
+  .map(raceId => {
+    let result = raceResults[raceId];
+    return {
+      raceId: raceId,
+      name: `${new Date(raceMap.get(raceId).date).getFullYear()} ${raceMap.get(raceId).name}`,
+      date: raceMap.get(raceId).date,
+      start: 'TBD',
+      end: 'TBD',
+      distance: 'TBD',
+      time: result[0].duration,
+      winner: result[0].driverName
+    };
+  })
+  .sort((r1, r2) => {
+    return new Date(r1.date) - new Date(r2.date);
+  });
+
+  return list;
+}
+
 function getDriverStats(raceResults, participantMap) {
   let stats = Object.keys(raceResults).map(key => {return raceResults[key];})
   .reduce((drivers, curRace) => {
@@ -307,12 +329,13 @@ function main() {
     let legResults = getLegResults(promiseResults[2], raceMap);
 
     let raceResults = getRaceResults(legResults, participantMap);
+    let raceList = getRaceList(raceResults, raceMap);
     let driverStats = getDriverStats(raceResults, participantMap);
 
     console.log('Updating Firebase');
     let fbRef = new Firebase('https://dttdata.firebaseio.com/');
     fbRef.set({
-      races: Array.from(raceMap.values()),
+      races: raceList,
       raceResults: raceResults,
       driverStats: driverStats
     });

@@ -3,6 +3,9 @@
 <link rel="import" href="../bower_components/firebase-element/firebase-document.html">
 <link rel="import" href="../bower_components/vaadin-grid/vaadin-grid.html">
 
+<script src="../bower_components/moment/moment.js"></script>
+<script src="../bower_components/moment-duration-format/lib/moment-duration-format.js"></script>
+
 <dom-module id="race-table">
   <template>
     <style>
@@ -15,15 +18,16 @@
       location="https://dttdata.firebaseio.com/races"
       data="{{_rows}}"></firebase-document>
 
-    <vaadin-grid id="grid" items="[[_rows]]">
+    <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1">
       <table>
         <colgroup>
-          <col name="raceId" sortable>
+          <col name="name" sortable flex>
           <col name="date" sortable>
           <col name="start" sortable>
           <col name="end" sortable>
           <col name="distance" sortable>
-          <col name="winner" sortable flex>
+          <col name="time" sortable>
+          <col name="winner" sortable>
         </colgroup>
       </table>
     </vaadin-grid>
@@ -44,7 +48,11 @@
 
         grid.columns[1].renderer = (cell) => {
           cell.element.innerHTML = new Date(cell.data).toLocaleDateString();
-        };
+        },
+
+        grid.columns[5].renderer = (cell) => {
+          cell.element.innerHTML = moment.duration(cell.data).format('h:mm:ss', {trim: false});
+        },
 
         //Sorting logic
         grid.addEventListener('sort-order-changed', () => {
