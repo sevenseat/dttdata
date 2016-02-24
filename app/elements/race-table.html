@@ -22,11 +22,13 @@
       <table>
         <colgroup>
           <col name="name" sortable>
+          <col name="theme" sortable>
           <col name="date" sortable>
           <col name="start" sortable>
           <col name="end" sortable>
           <col name="distance" sortable>
           <col name="time" sortable>
+          <col name="speed" sortable>
           <col name="winner" sortable>
         </colgroup>
       </table>
@@ -46,11 +48,11 @@
       ready() {
         let grid = this.$.grid;
 
-        grid.columns[1].renderer = (cell) => {
+        grid.columns[2].renderer = (cell) => {
           cell.element.innerHTML = new Date(cell.data).toLocaleDateString();
         },
 
-        grid.columns[5].renderer = (cell) => {
+        grid.columns[6].renderer = (cell) => {
           cell.element.innerHTML = moment.duration(cell.data).format('h:mm:ss', {trim: false});
         },
 

@@ -51,6 +51,7 @@ function getRaceMap(rows) {
     raceMap.set(row.raceid, {
       raceId: row.raceid,
       name: `${row.year} ${row.racename}`,
+      theme: row.theme,
       abbreviation: row.raceabbr,
       date: Moment.tz(row.date, 'MM/DD/YYYY', 'America/New_York').toDate(),
       numLegs: Number.parseInt(row.numlegs),
@@ -278,11 +279,13 @@ function getRaceList(raceResults, raceMap) {
     return {
       raceId: raceId,
       name: raceMap.get(raceId).name,
+      theme: raceMap.get(raceId).theme,
       date: raceMap.get(raceId).date.toJSON(),
       start: raceMap.get(raceId).start,
       end: raceMap.get(raceId).finish,
       distance: raceMap.get(raceId).distance,
       time: result[0].duration,
+//      speed: raceMap.get(raceId).distance / Moment.duration(result[0].duration).asSeconds() / 3600,
       winner: result[0].driverName
     };
   })
