@@ -187,12 +187,14 @@ function getRaceResults(legResults, participantMap) {
   //first get leg rankings by doing some cool sorting work
   .sort((r1, r2) => {
     if (r1.raceId !== r2.raceId) {
-      return r1.date - r2.date;
-    } else if (r1.leg !== r2.leg) {
+      return r1.start - r2.start;
+    }
+    if (r1.leg !== r2.leg) {
       return r1.leg - r2.leg;
     }
-    return r1.duration - r2.duration;
+    return r1.duration.asSeconds() - r2.duration.asSeconds();
   })
+  //rank the individual race legs
   .map((curResult, index, allResults) => {
     let rank = 1;
     if (index !== 0) {
@@ -241,7 +243,7 @@ function getRaceResults(legResults, participantMap) {
     return races;
   }, {});
 
-  // convert the participant list to an array sorted by duration
+  // convert the participant list to an array sorted by total duration
   Object.keys(raceResults).forEach(raceId => {
     raceResults[raceId] = Object.keys(raceResults[raceId])
     .map(driverId => raceResults[raceId][driverId])

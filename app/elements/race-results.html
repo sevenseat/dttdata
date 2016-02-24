@@ -1,5 +1,9 @@
 <link rel="import" href="../bower_components/polymer/polymer.html">
 
+<link rel="import" href="../bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
+<link rel="import" href="../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../bower_components/paper-listbox/paper-listbox.html">
+
 <link rel="import" href="../bower_components/firebase-element/firebase-document.html">
 <link rel="import" href="../bower_components/vaadin-grid/vaadin-grid.html">
 
@@ -15,11 +19,54 @@
     </style>
 
     <firebase-document
-      location="[[_getFirebaseUrl(raceId)]]"
-      data="{{_rows}}"></firebase-document>
+      location="https://dttdata.firebaseio.com/races"
+      data="{{_races}}"></firebase-document>
 
-    <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1">
-        <!-- Declared Imperitively within Ready function -->
+    <firebase-document
+      location="[[_getFirebaseUrl(raceId)]]"
+      data="{{_results}}"></firebase-document>
+
+    <paper-dropdown-menu label="Select Race">
+      <paper-listbox class="dropdown-content" selected="{{_raceIndex}}">
+        <template is="dom-repeat" items="[[_races]]" as="race">
+          <paper-item>[[race.name]]</paper-item>
+        </template>
+      </paper-listbox>
+    </paper-dropdown-menu>
+
+    <vaadin-grid id="grid" items="[[_results]]" frozen-columns="2" on-sort-order-changed="_sort">
+      <table>
+        <colgroup>
+          <col name="rank" sortable/>
+          <col name="driverName" sortable/>
+          <template is="dom-repeat" items="[[_legs]]" as="leg" on-dom-change="_setRenderers">
+            <col name$="legs.[[leg]].start" sortable/>
+            <col name$="legs.[[leg]].end" sortable/>
+            <col name$="legs.[[leg]].duration" sortable/>
+            <col name$="legs.[[leg]].rank" sortable/>
+          </template>
+          <col name="duration" sortable/>
+        </colgroup>
+        <thead>
+          <tr>
+            <th colspan="2"></th>
+            <template is="dom-repeat" items="[[_legs]]" as="leg">
+              <th colspan="4">Leg [[leg]]</th>
+            </template>
+          </tr>
+          <tr>
+            <th>Rank</th>
+            <th>Driver</th>
+            <template is="dom-repeat" items="[[_legs]]" as="leg">
+              <th>Start</th>
+              <th>End</th>
+              <th>Duration</th>
+              <th>Rank</th>
+            </template>
+            <th>Total Duration</th>
+          </tr>
+        </thead>
+      </table>
     </vaadin-grid>
   </template>
   <script>
@@ -30,73 +77,64 @@
       is: 'race-results',
 
       properties: {
-        raceId: String,
-        _rows: Array,
+        raceId: {
+          type: String,
+          computed: `_getRaceId(_raceIndex)`
+        },
+
+        _results: {
+          type: Array,
+          //HACK: dom-repeat is async, so we need to set this after ready()
+          //leveraging the natural delay of a JSON request
+          observer: '_setRenderers'
+        },
+
         _legs: {
           type: Array,
-          value: [1, 2, 3]
+          value: [1, 2, 3],
+          // computed: '_getLegsArray(_results)'
         }
-      },
-
-      ready() {
-        let grid = this.$.grid;
-
-        // Set the columns impertively
-        let columns = [
-          {name: 'driverName', sortable: true},
-          {name: 'navigatorName', sortable: true}
-        ];
-        let header1 = ['',''];
-        let header2 = ['Driver', 'Navigator'];
-        this._legs.forEach(leg => {
-          columns = columns.concat([
-            {name: `legs.${leg}.start`, sortable: true},
-            {name: `legs.${leg}.end`, sortable: true},
-            {name: `legs.${leg}.duration`, sortable: true}
-          ]);
-          header1 = header1.concat([`Leg ${leg}`, '', '']);
-          header2 = header2.concat(['Start', 'End', 'Duration']);
-        });
-
-        // Add the total column
-        columns.push({name: `duration`, sortable: true});
-        columns.push({name: `rank`, sortable: true});
-        header2.push('Total');
-        header2.push('Rank');
-
-        grid.columns = columns;
-        for (let i = 2; i < 2 + (3 * this._legs.length); i += 3) {
-          grid.columns[i].renderer = this._timeRenderer;
-          grid.columns[i + 1].renderer = this._timeRenderer;
-          grid.columns[i + 2].renderer = this._durationRenderer;
-        }
-        //set the renderer for the total time
-        grid.columns[grid.columns.length - 2].renderer = this._durationRenderer;
-
-        grid.header.addRow(1, header1);
-        grid.header.addRow(2, header2);
-        grid.header.removeRow(0);
-
-        //Sorting logic
-        grid.addEventListener('sort-order-changed', () => {
-          var key = grid.columns[grid.sortOrder[0].column].name;
-          var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
-          this._rows.sort(function(a, b) {
-            return (a[key] < b[key]) ? lesser : -lesser;
-          });
-        });
       },
 
       _getFirebaseUrl() {
         return `https://dttdata.firebaseio.com/raceResults/${encodeURIComponent(this.raceId)}`;
       },
 
-      _timeRenderer(cell) {
-        cell.element.innerHTML = new Date(cell.data).toLocaleTimeString('en-US', {hour12: false});
+      _sort() {
+        let grid = this.$.grid;
+        var key = grid.columns[grid.sortOrder[0].column].name;
+        var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+        this._results.sort(function(a, b) {
+          return (a[key] < b[key]) ? lesser : -lesser;
+        });
       },
 
-      _durationRenderer(cell) {
-        cell.element.innerHTML = moment.duration(cell.data).format('h:mm:ss', {trim: false});
+      _setRenderers() {
+        this.$.grid.columns.forEach(column => {
+          if (/duration$/.test(column.name)) {
+            column.renderer = (cell) => {
+              cell.element.innerHTML =
+                    moment.duration(cell.data).format('h:mm:ss', {trim: false});
+            };
+          }
+          if (/(start)|(end)$/.test(column.name)) {
+            column.renderer = (cell) => {
+              cell.element.innerHTML =
+                    new Date(cell.data).toLocaleTimeString('en-US', {hour12: false});
+            };
+          }
+          console.log(column.name);
+        });
+      },
+
+      _getRaceId(index) {
+        return this._races[index].raceId;
+      },
+
+      _getLegsArray(index) {
+        let numLegs = this._races[index].legs;
+        console.log(`Num Legs = ${numLegs}`);
+        return new Array(numLegs).map((cur, index) => index + 1);
       }
 
     });
