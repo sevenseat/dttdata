@@ -15,7 +15,7 @@
       location="https://dttdata.firebaseio.com/driverStats"
       data="{{_rows}}"></firebase-document>
 
-    <vaadin-grid id="grid" items="[[_rows]]">
+    <vaadin-grid id="grid" items="[[_rows]]" on-sort-order-changed="_sort">
       <table>
         <colgroup>
           <col name="name" sortable>
@@ -41,18 +41,15 @@
 
       },
 
-      ready() {
-
+      _sort() {
         let grid = this.$.grid;
-        grid.addEventListener('sort-order-changed', () => {
-          var key = grid.columns[grid.sortOrder[0].column].name;
-          var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
-          this._rows.sort(function(a, b) {
-            return (a[key] < b[key]) ? lesser : -lesser;
-          });
+        var key = grid.columns[grid.sortOrder[0].column].name;
+        var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+        this._rows.sort(function(a, b) {
+          return (a[key] < b[key]) ? lesser : -lesser;
         });
+      },
 
-      }
     });
   })();
   </script>

@@ -18,7 +18,7 @@
       location="https://dttdata.firebaseio.com/races"
       data="{{_rows}}"></firebase-document>
 
-    <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1">
+    <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1"  on-sort-order-changed="_sort">
       <table>
         <colgroup>
           <col name="name" sortable>
@@ -50,21 +50,21 @@
 
         grid.columns[2].renderer = (cell) => {
           cell.element.innerHTML = new Date(cell.data).toLocaleDateString();
-        },
+        };
 
         grid.columns[6].renderer = (cell) => {
           cell.element.innerHTML = moment.duration(cell.data).format('h:mm:ss', {trim: false});
-        },
+        };
 
-        //Sorting logic
-        grid.addEventListener('sort-order-changed', () => {
-          var key = grid.columns[grid.sortOrder[0].column].name;
-          var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
-          this._rows.sort(function(a, b) {
-            return (a[key] < b[key]) ? lesser : -lesser;
-          });
+      },
+
+      _sort() {
+        let grid = this.$.grid;
+        var key = grid.columns[grid.sortOrder[0].column].name;
+        var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+        this._rows.sort(function(a, b) {
+          return (a[key] < b[key]) ? lesser : -lesser;
         });
-
       },
 
     });
