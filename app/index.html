@@ -135,6 +135,7 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               <paper-material elevation="1">
 
                 <p class="paper-font-subhead">Welcome to some truly useless info</p>
+                <a href$="{{baseUrl}}race-details/2009DTT">2009 DTT</a><br>
 
               </paper-material>
             </section>
@@ -155,16 +156,15 @@ subject to an additional IP rights grant found at http://polymer.github.io/PATEN
               </paper-material>
             </section>
 
-            <section data-route="navigators">
+            <section data-route="race-details">
               <paper-material elevation="1">
-                <race-results race-id="2015 ROF"></race-results>
+                <race-results race-id="{{params.raceId}}"></race-results>
               </paper-material>
             </section>
 
-            <section data-route="user-info">
+            <section data-route="navigators">
               <paper-material elevation="1">
-                <h2 class="page-title">User: {{params.name}}</h2>
-                <div>This is {{params.name}}'s section</div>
+                <h2 class="page-title">Coming Soon</h2>
               </paper-material>
             </section>
 

@@ -19,20 +19,10 @@
     </style>
 
     <firebase-document
-      location="https://dttdata.firebaseio.com/races"
-      data="{{_races}}"></firebase-document>
-
-    <firebase-document
       location="[[_getFirebaseUrl(raceId)]]"
       data="{{_results}}"></firebase-document>
 
-    <paper-dropdown-menu label="Select Race">
-      <paper-listbox class="dropdown-content" selected="{{_raceIndex}}">
-        <template is="dom-repeat" items="[[_races]]" as="race">
-          <paper-item>[[race.name]]</paper-item>
-        </template>
-      </paper-listbox>
-    </paper-dropdown-menu>
+    <p class="paper-font-subhead">[[raceId]]</p>
 
     <vaadin-grid id="grid" items="[[_results]]" frozen-columns="2" on-sort-order-changed="_sort">
       <table>
@@ -79,20 +69,20 @@
       properties: {
         raceId: {
           type: String,
-          computed: `_getRaceId(_raceIndex)`
+          // computed: `_getRaceId(_raceIndex)`
         },
 
         _results: {
           type: Array,
-          //HACK: dom-repeat is async, so we need to set this after ready()
-          //leveraging the natural delay of a JSON request
-          observer: '_setRenderers'
         },
 
         _legs: {
           type: Array,
-          value: [1, 2, 3],
-          // computed: '_getLegsArray(_results)'
+          computed: '_getLegsArray(_results)',
+          //HACK: dom-repeat is async, so we need to set this after ready()
+          //leveraging the natural delay of a JSON request
+          observer: '_setRenderers'
+
         }
       },
 
@@ -102,14 +92,16 @@
 
       _sort() {
         let grid = this.$.grid;
-        var key = grid.columns[grid.sortOrder[0].column].name;
-        var lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
+        let key = grid.columns[grid.sortOrder[0].column].name;
+        let lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
         this._results.sort(function(a, b) {
           return (a[key] < b[key]) ? lesser : -lesser;
         });
       },
 
       _setRenderers() {
+        //TODO: This is broken.  Prior hack no longer works because I'm now Getting
+        //the # of legs dynamically
         this.$.grid.columns.forEach(column => {
           if (/duration$/.test(column.name)) {
             column.renderer = (cell) => {
@@ -127,14 +119,14 @@
         });
       },
 
-      _getRaceId(index) {
-        return this._races[index].raceId;
-      },
-
-      _getLegsArray(index) {
-        let numLegs = this._races[index].legs;
+      _getLegsArray() {
+        let numLegs = this._results[0].legs.length - 1; //array is not zero indexed
         console.log(`Num Legs = ${numLegs}`);
-        return new Array(numLegs).map((cur, index) => index + 1);
+        let retVal = [];
+        for (let i = 1; i <= numLegs; i++) {
+          retVal.push(i);
+        }
+        return retVal;
       }
 
     });

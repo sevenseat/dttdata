@@ -18,7 +18,8 @@
       location="https://dttdata.firebaseio.com/races"
       data="{{_rows}}"></firebase-document>
 
-    <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1"  on-sort-order-changed="_sort">
+    <vaadin-grid id="grid" items="[[_rows]]" frozen-columns="1"
+                  on-sort-order-changed="_sort" on-selected-items-changed="_select">
       <table>
         <colgroup>
           <col name="name" sortable>
@@ -56,6 +57,14 @@
           cell.element.innerHTML = moment.duration(cell.data).format('h:mm:ss', {trim: false});
         };
 
+      },
+
+      _select() {
+        let grid = this.$.grid;
+        grid.selection.selected(index => {
+          let raceId = this._rows[index].raceId;
+          page(`/race-details/${raceId}`);
+        });
       },
 
       _sort() {
