@@ -75,7 +75,7 @@ function getLegResults(rows, raceMap) {
       navigatorId: 'n/a',
       start: RACE_DATE.clone().add(Moment.duration(row.starttime)),
       end: RACE_DATE.clone().add(Moment.duration(row.finishtime)),
-      duration: Moment.duration(row.dnf === 'TRUE' ? Number.MAX_VALUE : row.legduration),
+      duration: Moment.duration(row.legduration),
       rank: null, //placeholder
       dnf: row.dnf === 'TRUE' ? true : false,
       unknownTime: row.unknown === 'TRUE' ? true : false
@@ -183,6 +183,15 @@ function getLegResults(rows, raceMap) {
 //
 // }
 
+function resultCompare(r1, r2) {
+  let compareVal = (r => {
+    if (r.dnf === true) { return Number.MAX_VALUE / 2; }
+    if (r.unknownTime === true) { return Number.MAX_VALUE; }
+    return r.duration.asMilliseconds();
+  });
+  return compareVal(r1) - compareVal(r2);
+}
+
 function getRaceResults(legResults, participantMap) {
   let raceResults = legResults
   //first get leg rankings by doing some cool sorting work
@@ -193,7 +202,7 @@ function getRaceResults(legResults, participantMap) {
     if (r1.leg !== r2.leg) {
       return r1.leg - r2.leg;
     }
-    return r1.duration.asSeconds() - r2.duration.asSeconds();
+    return resultCompare(r1, r2);
   })
   //rank the individual race legs
   .map((curResult, index, allResults) => {
@@ -226,7 +235,8 @@ function getRaceResults(legResults, participantMap) {
         duration: Moment.duration(0),
         rank: null,
         legs: {},
-        dnf: false
+        dnf: false,
+        unknownTime: false
       };
     }
     races[curLeg.raceId][curLeg.driverId].legs[curLeg.leg] = {
@@ -238,9 +248,8 @@ function getRaceResults(legResults, participantMap) {
       unknownTime: curLeg.unknownTime
     };
     races[curLeg.raceId][curLeg.driverId].duration.add(curLeg.duration);
-    if (curLeg.dnf === true) {
-      races[curLeg.raceId][curLeg.driverId].dnf = true;
-    }
+    if (curLeg.dnf === true) { races[curLeg.raceId][curLeg.driverId].dnf = true; }
+    if (curLeg.unknownTime === true) { races[curLeg.raceId][curLeg.driverId].unknownTime = true; }
     return races;
   }, {});
 
@@ -248,14 +257,19 @@ function getRaceResults(legResults, participantMap) {
   Object.keys(raceResults).forEach(raceId => {
     raceResults[raceId] = Object.keys(raceResults[raceId])
     .map(driverId => raceResults[raceId][driverId])
-    .sort((r1,r2) => {
-      let d1 = r1.dnf ? Number.MAX_VALUE : r1.duration;
-      let d2 = r2.dnf ? Number.MAX_VALUE : r2.duration;
-      return d1 - d2;
-    })
-    .map((result, index) => {
+    .sort(resultCompare)
+    .map((result, index, prevResults) => {
       // TODO - handle DNFs and unknown times
-      result.rank = index + 1;
+      if (index === 0) {
+        result.rank = 1;
+      } else {
+        let prevResult = prevResults[index - 1];
+        if (resultCompare(result, prevResult) === 0) {
+          result.rank = prevResult.rank;
+        } else {
+          result.rank = prevResult.rank + 1;
+        }
+      }
       return result;
     })
     // HACK - convert all Durations to JSON to fix serialization issue w/Firebase
@@ -285,7 +299,8 @@ function getRaceList(raceResults, raceMap) {
       end: raceMap.get(raceId).finish,
       distance: raceMap.get(raceId).distance,
       time: result[0].duration,
-//      speed: raceMap.get(raceId).distance / Moment.duration(result[0].duration).asSeconds() / 3600,
+      // speed: raceMap.get(raceId).distance /
+      // Moment.duration(result[0].duration).asSeconds() / 3600,
       winner: result[0].driverName
     };
   })
