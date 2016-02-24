@@ -24,12 +24,12 @@
 
     <p class="paper-font-subhead">[[raceId]]</p>
 
-    <vaadin-grid id="grid" items="[[_results]]" frozen-columns="2" on-sort-order-changed="_sort">
+    <vaadin-grid id="grid" items="[[_results.results]]" frozen-columns="2" on-sort-order-changed="_sort">
       <table>
         <colgroup>
           <col name="rank" sortable/>
           <col name="driverName" sortable/>
-          <template is="dom-repeat" items="[[_legs]]" as="leg" on-dom-change="_setRenderers">
+          <template is="dom-repeat" items="[[_legs]]" as="leg" on-dom-change="_test">
             <col name$="legs.[[leg]].start" sortable/>
             <col name$="legs.[[leg]].end" sortable/>
             <col name$="legs.[[leg]].duration" sortable/>
@@ -94,7 +94,7 @@
         let grid = this.$.grid;
         let key = grid.columns[grid.sortOrder[0].column].name;
         let lesser = grid.sortOrder[0].direction === 'asc' ? -1 : 1;
-        this._results.sort(function(a, b) {
+        this._results.results.sort(function(a, b) {
           return (a[key] < b[key]) ? lesser : -lesser;
         });
       },
@@ -120,13 +120,17 @@
       },
 
       _getLegsArray() {
-        let numLegs = this._results[0].legs.length - 1; //array is not zero indexed
+        let numLegs = this._results.numLegs; //array is not zero indexed
         console.log(`Num Legs = ${numLegs}`);
         let retVal = [];
         for (let i = 1; i <= numLegs; i++) {
           retVal.push(i);
         }
         return retVal;
+      },
+
+      _test() {
+        console.log('ON DOM CHANGED!!!!!!!!');
       }
 
     });

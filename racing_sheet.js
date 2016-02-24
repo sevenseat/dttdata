@@ -192,16 +192,12 @@ function resultCompare(r1, r2) {
   return compareVal(r1) - compareVal(r2);
 }
 
-function getRaceResults(legResults, participantMap) {
+function getRaceResults(legResults, participantMap, raceMap) {
   let raceResults = legResults
   //first get leg rankings by doing some cool sorting work
   .sort((r1, r2) => {
-    if (r1.raceId !== r2.raceId) {
-      return r1.start - r2.start;
-    }
-    if (r1.leg !== r2.leg) {
-      return r1.leg - r2.leg;
-    }
+    if (r1.raceId !== r2.raceId) { return r1.start - r2.start; }
+    if (r1.leg !== r2.leg) { return r1.leg - r2.leg; }
     return resultCompare(r1, r2);
   })
   //rank the individual race legs
@@ -283,14 +279,11 @@ function getRaceResults(legResults, participantMap) {
       return result;
     });
   });
-  return raceResults;
-}
 
-function getRaceList(raceResults, raceMap) {
-  let list = Object.keys(raceResults)
-  .map(raceId => {
+  return Object.keys(raceResults)
+  .reduce((results, raceId) => {
     let result = raceResults[raceId];
-    return {
+    results[raceId] = {
       raceId: raceId,
       name: raceMap.get(raceId).name,
       theme: raceMap.get(raceId).theme,
@@ -298,11 +291,27 @@ function getRaceList(raceResults, raceMap) {
       start: raceMap.get(raceId).start,
       end: raceMap.get(raceId).finish,
       distance: raceMap.get(raceId).distance,
+      numLegs: raceMap.get(raceId).numLegs,
       time: result[0].duration,
       // speed: raceMap.get(raceId).distance /
       // Moment.duration(result[0].duration).asSeconds() / 3600,
-      winner: result[0].driverName
+      winner: result[0].driverName,
+      results: raceResults[raceId]
     };
+    return results;
+  }, {});
+
+}
+
+function getRaceList(raceResults) {
+
+  //deep copy
+  let clonedResults = JSON.parse(JSON.stringify(raceResults)) ;
+
+  let list = Object.keys(clonedResults)
+  .map(raceId => {
+    delete clonedResults[raceId].results;
+    return clonedResults[raceId];
   })
   .sort((r1, r2) => {
     return new Date(r1.date) - new Date(r2.date);
@@ -311,8 +320,15 @@ function getRaceList(raceResults, raceMap) {
   return list;
 }
 
+// function getScores(raceResults) {
+//   let scores = Object.keys(raceResults).map(key => {return raceResults[key];})
+//   .map(race => {
+//
+//   })
+// }
+
 function getDriverStats(raceResults, participantMap) {
-  let stats = Object.keys(raceResults).map(key => {return raceResults[key];})
+  let stats = Object.keys(raceResults).map(key => {return raceResults[key].results;})
   .reduce((drivers, curRace) => {
     curRace.forEach(driver => {
       if (!drivers.has(driver.driverId)) {
@@ -350,8 +366,11 @@ function main() {
     let raceMap = promiseResults[1];
     let legResults = getLegResults(promiseResults[2], raceMap);
 
-    let raceResults = getRaceResults(legResults, participantMap);
+    let raceResults = getRaceResults(legResults, participantMap, raceMap);
     let raceList = getRaceList(raceResults, raceMap);
+
+    // let driverScores = getScores(raceResults);
+
     let driverStats = getDriverStats(raceResults, participantMap);
 
     console.log('Updating Firebase');
