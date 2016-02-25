@@ -20,9 +20,7 @@ var _ = require('lodash');
 function getSheetRows(sheet, tab) {
   return new Promise((resolve,reject) => {
     Sheet.getRows(tab, (err, rows) => {
-      if (err !== null) {
-        reject(err);
-      }
+      if (err !== null) {reject(err);}
       resolve(rows);
     });
   });
@@ -194,7 +192,6 @@ function getRaceResults(legResults, participantMap, raceMap) {
 }
 
 function getRaceList(raceResults) {
-
   //TODO: figure out how to chain this... couldn't figure out how to make it work
   let list =  _.cloneDeep(raceResults);
 
@@ -251,7 +248,8 @@ function getDriverStats(raceResults, participantMap) {
           finishes: 0,
           wins: 0,
           podiums: 0,
-          driverSkill: participantMap.get(driverId).driverSkill.conservativeRating.toFixed(2)
+          driverSkill: participantMap.get(driverId).driverSkill.conservativeRating.toFixed(2),
+          rank: null,
         });
       }
 
@@ -264,7 +262,11 @@ function getDriverStats(raceResults, participantMap) {
     return drivers;
   }, new Map());
   return Array.from(stats.values())
-  .sort((d1, d2) => {return d2.driverSkill - d1.driverSkill;});
+  .sort((d1, d2) => {return d2.driverSkill - d1.driverSkill;})
+  .map((driver, index) => {
+    driver.rank = index + 1;
+    return driver;
+  });
 }
 
 function printDriverStats(driverStats) {
