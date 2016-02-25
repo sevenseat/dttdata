@@ -15,6 +15,8 @@ var GameInfo = require(`${TS_PATH}/GameInfo`).getDefaultGameInfo();
 var Player = require(`${TS_PATH}/Player`);
 var Team = require(`${TS_PATH}/Team`);
 
+var _ = require('lodash');
+
 function getSheetRows(sheet, tab) {
   return new Promise((resolve,reject) => {
     Sheet.getRows(tab, (err, rows) => {
@@ -29,16 +31,8 @@ function getSheetRows(sheet, tab) {
 //Participants
 function getParticipantMap(rows) {
   return rows.reduce((participantMap, row) => {
-    let participantId = Number.parseInt(row.participantid);
-    let fullname = `${row.last}, ${row.first}`;
-    // if (row.nickname.length > 0) {fullname += ` (${row.nickname})`;}
-    participantMap.set(participantId, {
-      fullname: fullname,
-      name: {
-        lastname: row.last,
-        firstname: row.first,
-        nickname: row.nickname,
-      },
+    participantMap.set(Number.parseInt(row.participantid), {
+      fullname: `${row.last}, ${row.first}`,
       driverSkill: GameInfo.getDefaultRating()
     });
     return participantMap;
@@ -136,14 +130,9 @@ function getRaceResults(legResults, participantMap, raceMap) {
         unknownTime: false
       };
     }
-    races[curLeg.raceId][curLeg.driverId].legs[curLeg.leg] = {
-      start: curLeg.start,
-      end: curLeg.end,
-      duration: curLeg.duration,
-      rank: curLeg.rank,
-      dnf: curLeg.dnf,
-      unknownTime: curLeg.unknownTime
-    };
+    races[curLeg.raceId][curLeg.driverId].legs[curLeg.leg] = _.pick(curLeg,
+      ['start','end', 'duration', 'rank', 'dnf', 'unknownTime']);
+
     races[curLeg.raceId][curLeg.driverId].duration.add(curLeg.duration);
     if (curLeg.dnf === true) { races[curLeg.raceId][curLeg.driverId].dnf = true; }
     if (curLeg.unknownTime === true) { races[curLeg.raceId][curLeg.driverId].unknownTime = true; }
@@ -206,72 +195,58 @@ function getRaceResults(legResults, participantMap, raceMap) {
 
 function getRaceList(raceResults) {
 
-  //deep copy
-  let clonedResults = JSON.parse(JSON.stringify(raceResults)) ;
+  //TODO: figure out how to chain this... couldn't figure out how to make it work
+  let list =  _.cloneDeep(raceResults);
 
-  let list = Object.keys(clonedResults)
-  .map(raceId => {
-    delete clonedResults[raceId].results;
-    return clonedResults[raceId];
+  return _.map(list, race => {
+    delete race.results;
+    return race;
   })
-  .sort((r1, r2) => {
-    return new Date(r1.date) - new Date(r2.date);
-  });
-
-  return list;
+  .sort((r1, r2) => { return new Date(r1.date) - new Date(r2.date);});
 }
 
 function getScores(raceResults, participantMap) {
+  _.forEach(raceResults, race => {
+    _.range(1, race.numLegs).forEach(leg => {
+      let legResults = race.results
+      .filter(raceResult => {
+        return (raceResult.legs[leg] !== undefined) &&
+              //doing it on the race level to reduce the frequency of scoring
+              //iteration problems
+               (raceResult.unknownTime === false);
+      })
+      .reduce((legResults, raceResult) => {
+        let driverId = raceResult.driverId;
+        let team =  new Team(driverId.toString(),
+                             new Player(driverId),
+                             participantMap.get(driverId).driverSkill);
 
-  Object.keys(raceResults).map(key => {return raceResults[key];})
-  .forEach(race => {
-    for (let leg = 1; leg <= race.numLegs; leg++) {
-      let results = race.results
-      .filter(result => {return result.unknownTime === false;})
-      .filter(result => {return result.legs[leg] !== undefined;})
-      .map(result => {
-        console.log(`${race.name} ${leg} ${result.driverId}`);
-        return {
-          driverId: result.driverId,
-          rank: result.legs[leg].rank,
-        };
-      })
-      .sort((r1, r2) => {return r2.rank - r1.rank;})
-      .map(result => {
-        let driver = new Player(result.driverId);
-        let driverSkill = participantMap.get(result.driverId).driverSkill;
-        let team =  new Team(result.driverId.toString(), driver, driverSkill)
-        return [team, result.rank]
-      })
-      .reduce((result, item) => {
-        result.teams.push(item[0]);
-        result.ranks.push(item[1]);
-        return result;
+        legResults.teams.push(team);
+        legResults.ranks.push(raceResult.legs[leg].rank);
+        return legResults;
       }, {teams: [], ranks: []});
 
-      console.log(`${race.name} ${leg} ${results.teams.length}`);
+      console.log(`${race.name} ${leg} ${legResults.teams.length}`);
       let newSkills = TrueSkillCalculator.calculateNewRatings(GameInfo,
-            results.teams, results.ranks);
+            legResults.teams, legResults.ranks);
 
-      results.teams.forEach(team => {
+      legResults.teams.forEach(team => {
         let player = team.getPlayers()[0];
         participantMap.get(player.getId()).driverSkill = newSkills[player];
       });
-
-    }
+    });
   });
-
-
 }
 
 function getDriverStats(raceResults, participantMap) {
   let stats = Object.keys(raceResults).map(key => {return raceResults[key].results;})
   .reduce((drivers, curRace) => {
     curRace.forEach(driver => {
-      if (!drivers.has(driver.driverId)) {
-        drivers.set(driver.driverId, {
-          id: driver.driverId,
-          name: participantMap.get(driver.driverId).fullname,
+      let driverId = driver.driverId;
+      if (!drivers.has(driverId)) {
+        drivers.set(driverId, {
+          id: driverId,
+          name: participantMap.get(driverId).fullname,
           starts: 0,
           finishes: 0,
           wins: 0,
@@ -280,7 +255,7 @@ function getDriverStats(raceResults, participantMap) {
         });
       }
 
-      let thisDriver = drivers.get(driver.driverId);
+      let thisDriver = drivers.get(driverId);
       thisDriver.starts++;
       if (!driver.dnf) {thisDriver.finishes++;}
       if (driver.rank === 1) {thisDriver.wins++;}
@@ -306,7 +281,7 @@ function main() {
     let raceResults = getRaceResults(legResults, participantMap, raceMap);
     let raceList = getRaceList(raceResults, raceMap);
 
-    let driverScores = getScores(raceResults, participantMap);
+    getScores(raceResults, participantMap);
 
     let driverStats = getDriverStats(raceResults, participantMap);
 
@@ -327,7 +302,7 @@ function main() {
     rankedDrivers.forEach((driver,index) => {
       console.log(`${index} ${driver.driverSkill.conservativeRating.toFixed(3)} ` +
                   `${driver.driverSkill.mean.toFixed(3)} ` +
-                  `${driver.name.lastname}, ${driver.name.firstname}`);
+                  `${driver.fullname}`);
     });
 
     console.log('all done');
