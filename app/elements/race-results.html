@@ -24,38 +24,8 @@
 
     <p class="paper-font-subhead">[[raceId]]</p>
 
-    <vaadin-grid id="grid" items="[[_results.results]]" frozen-columns="2" on-sort-order-changed="_sort">
+    <vaadin-grid id="grid" items="[[_results.results]]" on-sort-order-changed="_sort">
       <table>
-        <colgroup>
-          <col name="rank" sortable/>
-          <col name="driverName" sortable/>
-          <template is="dom-repeat" items="[[_legs]]" as="leg" on-dom-change="_test">
-            <col name$="legs.[[leg]].start" sortable/>
-            <col name$="legs.[[leg]].end" sortable/>
-            <col name$="legs.[[leg]].duration" sortable/>
-            <col name$="legs.[[leg]].rank" sortable/>
-          </template>
-          <col name="duration" sortable/>
-        </colgroup>
-        <thead>
-          <tr>
-            <th colspan="2"></th>
-            <template is="dom-repeat" items="[[_legs]]" as="leg">
-              <th colspan="4">Leg [[leg]]</th>
-            </template>
-          </tr>
-          <tr>
-            <th>Rank</th>
-            <th>Driver</th>
-            <template is="dom-repeat" items="[[_legs]]" as="leg">
-              <th>Start</th>
-              <th>End</th>
-              <th>Duration</th>
-              <th>Rank</th>
-            </template>
-            <th>Total Duration</th>
-          </tr>
-        </thead>
       </table>
     </vaadin-grid>
   </template>
@@ -74,20 +44,52 @@
 
         _results: {
           type: Array,
+          observer: '_setUpGrid'
         },
-
-        _legs: {
-          type: Array,
-          computed: '_getLegsArray(_results)',
-          //HACK: dom-repeat is async, so we need to set this after ready()
-          //leveraging the natural delay of a JSON request
-          observer: '_setRenderers'
-
-        }
-      },
+      }
 
       _getFirebaseUrl() {
         return `https://dttdata.firebaseio.com/raceResults/${encodeURIComponent(this.raceId)}`;
+      },
+
+      _setUpGrid() {
+        console.log('setup');
+        let grid = this.$.grid;
+
+        let header1 = ['',''];
+        let header2 = ['Rank', 'Driver'];
+
+        grid.addColumn({name: 'rank'});
+        grid.addColumn({name: 'driverName'});
+        for (let leg = 1; leg <= this._results.numLegs; leg++) {
+          grid.addColumn({name: `legs.${leg}.start`});
+          grid.columns[grid.columns.length - 1].renderer = this._timeRenderer;
+          grid.addColumn({name: `legs.${leg}.end`});
+          grid.columns[grid.columns.length - 1].renderer = this._timeRenderer;
+          grid.addColumn({name: `legs.${leg}.duration`});
+          grid.columns[grid.columns.length - 1].renderer = this._durationRenderer;
+          grid.addColumn({name: `legs.${leg}.rank`});
+          header1 = header1.concat(`Leg ${leg}`, '', '', '');
+          header2 = header2.concat('Start', 'End', 'Duration', 'Rank');
+        }
+        grid.addColumn({name: 'duration'});
+        grid.columns[grid.columns.length - 1].renderer = this._durationRenderer;
+        header1 = header1.concat('Total');
+        header2 = header2.concat('Duration');
+
+        grid.header.addRow(1, header1);
+        grid.header.addRow(2, header2);
+        grid.header.removeRow(0);
+      },
+
+      _timeRenderer(cell) {
+        cell.element.innerHTML =
+                    new Date(cell.data).toLocaleTimeString('en-US', {hour12: false});
+      },
+
+      _durationRenderer(cell) {
+        cell.element.innerHTML =
+                    moment.duration(cell.data).format('h:mm:ss', {trim: false});
       },
 
       _sort() {
@@ -98,42 +100,7 @@
           return (a[key] < b[key]) ? lesser : -lesser;
         });
       },
-
-      _setRenderers() {
-        //TODO: This is broken.  Prior hack no longer works because I'm now Getting
-        //the # of legs dynamically
-        this.$.grid.columns.forEach(column => {
-          if (/duration$/.test(column.name)) {
-            column.renderer = (cell) => {
-              cell.element.innerHTML =
-                    moment.duration(cell.data).format('h:mm:ss', {trim: false});
-            };
-          }
-          if (/(start)|(end)$/.test(column.name)) {
-            column.renderer = (cell) => {
-              cell.element.innerHTML =
-                    new Date(cell.data).toLocaleTimeString('en-US', {hour12: false});
-            };
-          }
-          console.log(column.name);
-        });
-      },
-
-      _getLegsArray() {
-        let numLegs = this._results.numLegs; //array is not zero indexed
-        console.log(`Num Legs = ${numLegs}`);
-        let retVal = [];
-        for (let i = 1; i <= numLegs; i++) {
-          retVal.push(i);
-        }
-        return retVal;
-      },
-
-      _test() {
-        console.log('ON DOM CHANGED!!!!!!!!');
-      }
-
     });
-  })();
+  });
   </script>
 </dom-module>
