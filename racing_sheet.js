@@ -15,7 +15,6 @@ var GameInfo = require(`${TS_PATH}/GameInfo`).getDefaultGameInfo();
 var Player = require(`${TS_PATH}/Player`);
 var Team = require(`${TS_PATH}/Team`);
 
-
 function getSheetRows(sheet, tab) {
   return new Promise((resolve,reject) => {
     Sheet.getRows(tab, (err, rows) => {
@@ -109,7 +108,7 @@ function getRaceResults(legResults, participantMap, raceMap) {
       let prevResult = allResults[index - 1];
       if ((prevResult.raceId === curResult.raceId) && (prevResult.leg === curResult.leg)) {
         //curResult is in the same leg
-        if (curResult.duration === prevResult.duration) {
+        if (resultCompare(curResult, prevResult) === 0) {
           rank = prevResult.rank;
         }  else {
           rank = prevResult.rank + 1;
@@ -229,13 +228,15 @@ function getScores(raceResults, participantMap) {
     for (let leg = 1; leg <= race.numLegs; leg++) {
       let results = race.results
       .filter(result => {return result.unknownTime === false;})
+      .filter(result => {return result.legs[leg] !== undefined;})
       .map(result => {
+        console.log(`${race.name} ${leg} ${result.driverId}`);
         return {
           driverId: result.driverId,
           rank: result.legs[leg].rank,
         };
       })
-      .sort((r1, r2) => {return r1 - r2;})
+      .sort((r1, r2) => {return r2.rank - r1.rank;})
       .map(result => {
         let driver = new Player(result.driverId);
         let driverSkill = participantMap.get(result.driverId).driverSkill;
@@ -248,7 +249,9 @@ function getScores(raceResults, participantMap) {
         return result;
       }, {teams: [], ranks: []});
 
-      let newSkills = TrueSkillCalculator.calculateNewRatings(GameInfo, results.teams, results.ranks);
+      console.log(`${race.name} ${leg} ${results.teams.length}`);
+      let newSkills = TrueSkillCalculator.calculateNewRatings(GameInfo,
+            results.teams, results.ranks);
 
       results.teams.forEach(team => {
         let player = team.getPlayers()[0];
@@ -316,17 +319,17 @@ function main() {
     });
 
     // //output the ranked list of drivers
-    // let rankedDrivers = Array.from(participantMap.values())
-    // .filter(a => { return typeof a.driverSkill !== 'undefined';})
-    // .sort((a,b) => {
-    //   return b.driverSkill.conservativeRating - a.driverSkill.conservativeRating;
-    // });
-    // rankedDrivers.forEach((driver,index) => {
-    //   console.log(`${index} ${driver.driverSkill.conservativeRating.toFixed(3)} ` +
-    //               `${driver.driverSkill.mean.toFixed(3)} ` +
-    //               `${driver.name.lastname}, ${driver.name.firstname}`);
-    // });
-    //
+    let rankedDrivers = Array.from(participantMap.values())
+    .filter(a => { return typeof a.driverSkill !== 'undefined';})
+    .sort((a,b) => {
+      return b.driverSkill.conservativeRating - a.driverSkill.conservativeRating;
+    });
+    rankedDrivers.forEach((driver,index) => {
+      console.log(`${index} ${driver.driverSkill.conservativeRating.toFixed(3)} ` +
+                  `${driver.driverSkill.mean.toFixed(3)} ` +
+                  `${driver.name.lastname}, ${driver.name.firstname}`);
+    });
+
     console.log('all done');
   })
   .catch(err => {
