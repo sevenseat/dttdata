@@ -88,7 +88,7 @@ function resultCompare(r1, r2) {
 }
 
 function getRaceResults(legResults, participantMap, raceMap) {
-  let raceResults = legResults
+  let raceResults = _(legResults)
   //first get leg rankings by doing some cool sorting work
   .sort((r1, r2) => {
     if (r1.raceId !== r2.raceId) { return r1.start - r2.start; }
@@ -198,6 +198,7 @@ function getRaceList(raceResults) {
   //TODO: figure out how to chain this... couldn't figure out how to make it work
   let list =  _.cloneDeep(raceResults);
 
+  // I wanted to use lo_dash "omit", but it didnt' work
   return _.map(list, race => {
     delete race.results;
     return race;
@@ -217,18 +218,15 @@ function getScores(raceResults, participantMap) {
       })
       .reduce((legResults, raceResult) => {
         let driverId = raceResult.driverId;
-        let team =  new Team(driverId.toString(),
-                             new Player(driverId),
-                             participantMap.get(driverId).driverSkill);
-
-        legResults.teams.push(team);
+        legResults.teams.push(new Team(driverId.toString(),
+                                       new Player(driverId),
+                                       participantMap.get(driverId).driverSkill));
         legResults.ranks.push(raceResult.legs[leg].rank);
         return legResults;
       }, {teams: [], ranks: []});
 
-      console.log(`${race.name} ${leg} ${legResults.teams.length}`);
       let newSkills = TrueSkillCalculator.calculateNewRatings(GameInfo,
-            legResults.teams, legResults.ranks);
+                      legResults.teams, legResults.ranks);
 
       legResults.teams.forEach(team => {
         let player = team.getPlayers()[0];
@@ -239,7 +237,9 @@ function getScores(raceResults, participantMap) {
 }
 
 function getDriverStats(raceResults, participantMap) {
-  let stats = Object.keys(raceResults).map(key => {return raceResults[key].results;})
+  let stats = _(raceResults)
+  .values()
+  .map(race => {return race.results;})
   .reduce((drivers, curRace) => {
     curRace.forEach(driver => {
       let driverId = driver.driverId;
@@ -251,7 +251,7 @@ function getDriverStats(raceResults, participantMap) {
           finishes: 0,
           wins: 0,
           podiums: 0,
-          skillRanking: null
+          driverSkill: participantMap.get(driverId).driverSkill.conservativeRating.toFixed(2)
         });
       }
 
@@ -263,7 +263,21 @@ function getDriverStats(raceResults, participantMap) {
     });
     return drivers;
   }, new Map());
-  return Array.from(stats.values());
+  return Array.from(stats.values())
+  .sort((d1, d2) => {return d2.driverSkill - d1.driverSkill;});
+}
+
+function printDriverStats(driverStats) {
+  // //output the ranked list of drivers
+  let rankedDrivers = driverStats
+  .filter(a => { return typeof a.driverSkill !== 'undefined';})
+  .sort((a,b) => {
+    return b.driverSkill - a.driverSkill;
+  });
+  rankedDrivers.forEach((driver,index) => {
+    let rating = driver.driverSkill;
+    console.log(`${index}\t${rating}\t${driver.starts}\t${driver.name}`);
+  });
 }
 
 function main() {
@@ -293,17 +307,7 @@ function main() {
       driverStats: driverStats
     });
 
-    // //output the ranked list of drivers
-    let rankedDrivers = Array.from(participantMap.values())
-    .filter(a => { return typeof a.driverSkill !== 'undefined';})
-    .sort((a,b) => {
-      return b.driverSkill.conservativeRating - a.driverSkill.conservativeRating;
-    });
-    rankedDrivers.forEach((driver,index) => {
-      console.log(`${index} ${driver.driverSkill.conservativeRating.toFixed(3)} ` +
-                  `${driver.driverSkill.mean.toFixed(3)} ` +
-                  `${driver.fullname}`);
-    });
+    printDriverStats(driverStats);
 
     console.log('all done');
   })
