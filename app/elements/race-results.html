@@ -1,9 +1,5 @@
 <link rel="import" href="../bower_components/polymer/polymer.html">
 
-<link rel="import" href="../bower_components/paper-dropdown-menu/paper-dropdown-menu.html">
-<link rel="import" href="../bower_components/paper-item/paper-item.html">
-<link rel="import" href="../bower_components/paper-listbox/paper-listbox.html">
-
 <link rel="import" href="../bower_components/firebase-element/firebase-document.html">
 <link rel="import" href="../bower_components/vaadin-grid/vaadin-grid.html">
 
@@ -46,7 +42,7 @@
           type: Array,
           observer: '_setUpGrid'
         },
-      }
+      },
 
       _getFirebaseUrl() {
         return `https://dttdata.firebaseio.com/raceResults/${encodeURIComponent(this.raceId)}`;
@@ -80,6 +76,8 @@
         grid.header.addRow(1, header1);
         grid.header.addRow(2, header2);
         grid.header.removeRow(0);
+
+        grid.frozenColumns = 2;
       },
 
       _timeRenderer(cell) {
@@ -101,6 +99,6 @@
         });
       },
     });
-  });
+  })();
   </script>
 </dom-module>
