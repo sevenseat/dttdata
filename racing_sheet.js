@@ -45,7 +45,7 @@ function getRaceMap(rows) {
       name: `${row.year} ${row.racename}`,
       theme: row.theme,
       abbreviation: row.raceabbr,
-      date: Moment.tz(row.date, 'MM/DD/YYYY', 'America/New_York').toDate(),
+      date: Moment.tz(row.date, 'MM/DD/YYYY', 'America/New_York').toJSON(),
       numLegs: Number.parseInt(row.numlegs),
       legs: [],
       toScore: row.toscore === 'TRUE' ? true : false,
@@ -65,9 +65,9 @@ function getLegResults(rows, raceMap) {
       leg: Number.parseInt(row.leg),
       driverId: Number.parseInt(row.driverid),
       navigatorId: 'n/a',
-      start: RACE_DATE.clone().add(Moment.duration(row.starttime)),
-      end: RACE_DATE.clone().add(Moment.duration(row.finishtime)),
-      duration: Moment.duration(row.legduration),
+      start: RACE_DATE.clone().add(Moment.duration(row.starttime)).toJSON(),
+      end: RACE_DATE.clone().add(Moment.duration(row.finishtime)).toJSON(),
+      duration: Moment.duration(row.legduration).toJSON(),
       rank: null, //placeholder
       dnf: row.dnf === 'TRUE' ? true : false,
       unknownTime: row.unknown === 'TRUE' ? true : false
@@ -80,16 +80,16 @@ function resultCompare(r1, r2) {
   let compareVal = (r => {
     if (r.dnf === true) { return Number.MAX_VALUE / 2; }
     if (r.unknownTime === true) { return Number.MAX_VALUE; }
-    return r.duration.asMilliseconds();
+    return Moment.duration(r.duration).asMilliseconds();
   });
   return compareVal(r1) - compareVal(r2);
 }
 
 function getRaceResults(legResults, participantMap, raceMap) {
-  let raceResults = _(legResults)
+  let raceResults = _.chain(legResults)
   //first get leg rankings by doing some cool sorting work
   .sort((r1, r2) => {
-    if (r1.raceId !== r2.raceId) { return r1.start - r2.start; }
+    if (r1.raceId !== r2.raceId) { return new Date(r1.start) - new Date(r2.start); }
     if (r1.leg !== r2.leg) { return r1.leg - r2.leg; }
     return resultCompare(r1, r2);
   })
@@ -121,7 +121,7 @@ function getRaceResults(legResults, participantMap, raceMap) {
         driverId: curLeg.driverId,
         driverName: participantMap.get(curLeg.driverId).fullname,
         navigatorName: 'n/a',
-        duration: Moment.duration(0),
+        duration: Moment.duration(0).toJSON(),
         rank: null,
         legs: {},
         dnf: false,
@@ -129,21 +129,19 @@ function getRaceResults(legResults, participantMap, raceMap) {
       };
     }
     races[curLeg.raceId][curLeg.driverId].legs[curLeg.leg] = _.pick(curLeg,
-      ['start','end', 'duration', 'rank', 'dnf', 'unknownTime']);
+      ['start','end', 'duration', 'rank', 'dnf', 'unknownTime', 'toScore']);
 
-    races[curLeg.raceId][curLeg.driverId].duration.add(curLeg.duration);
+    Moment.duration(races[curLeg.raceId][curLeg.driverId].duration).add(curLeg.duration);
     if (curLeg.dnf === true) { races[curLeg.raceId][curLeg.driverId].dnf = true; }
     if (curLeg.unknownTime === true) { races[curLeg.raceId][curLeg.driverId].unknownTime = true; }
     return races;
-  }, {});
+  }, {})
 
-  // convert the participant list to an array sorted by total duration
-  Object.keys(raceResults).forEach(raceId => {
-    raceResults[raceId] = Object.keys(raceResults[raceId])
-    .map(driverId => raceResults[raceId][driverId])
+  //create sorted table array of results
+  .reduce((resultsMap, raceResult, raceId) => {
+    resultsMap[raceId] = _(raceResult).values()
     .sort(resultCompare)
     .map((result, index, prevResults) => {
-      // TODO - handle DNFs and unknown times
       if (index === 0) {
         result.rank = 1;
       } else {
@@ -156,39 +154,29 @@ function getRaceResults(legResults, participantMap, raceMap) {
       }
       return result;
     })
-    // HACK - convert all Durations to JSON to fix serialization issue w/Firebase
-    .map(result => {
-      result.duration = result.duration.toJSON();
-      Object.keys(result.legs).forEach(function(leg) {
-        result.legs[leg].start = result.legs[leg].start.toJSON();
-        result.legs[leg].end = result.legs[leg].end.toJSON();
-        result.legs[leg].duration = result.legs[leg].duration.toJSON();
-      });
-      return result;
-    });
-  });
+    .value();
+    return resultsMap;
+  }, {})
+  .value();
 
-  return Object.keys(raceResults)
-  .reduce((results, raceId) => {
-    let result = raceResults[raceId];
-    results[raceId] = {
-      raceId: raceId,
-      name: raceMap.get(raceId).name,
-      theme: raceMap.get(raceId).theme,
-      date: raceMap.get(raceId).date.toJSON(),
-      start: raceMap.get(raceId).start,
-      end: raceMap.get(raceId).finish,
-      distance: raceMap.get(raceId).distance,
-      numLegs: raceMap.get(raceId).numLegs,
-      time: result[0].duration,
-      // speed: raceMap.get(raceId).distance /
-      // Moment.duration(result[0].duration).asSeconds() / 3600,
-      winner: result[0].driverName,
-      results: raceResults[raceId]
-    };
-    return results;
-  }, {});
+  let retVal = _(Array.from(raceMap.values()))
+  .map(race => {
+    var raceDetail = _.pick(race,
+        ['raceId', 'name', 'theme', 'date', 'start', 'end', 'distance', 'numLegs', 'toScore']);
+    let raceId = raceDetail.raceId;
+    if (raceResults[raceId] !== undefined) {
+      let results = raceResults[raceId];
+      raceDetail.results = results;
+      raceDetail.time = results[0].duration;
+      raceDetail.winner = results[0].driverName;
+    }
+    return raceDetail;
+  })
+  .value();
 
+  // console.log(retVal);
+
+  return retVal;
 }
 
 function getRaceList(raceResults) {
@@ -204,7 +192,9 @@ function getRaceList(raceResults) {
 }
 
 function getScores(raceResults, participantMap) {
-  _.forEach(raceResults, race => {
+  _(raceResults)
+  .filter(result => {return (result.toScore === true);})
+  .forEach(race =>
     _.range(1, race.numLegs).forEach(leg => {
       let legResults = race.results
       .filter(raceResult => {
@@ -229,15 +219,18 @@ function getScores(raceResults, participantMap) {
         let player = team.getPlayers()[0];
         participantMap.get(player.getId()).driverSkill = newSkills[player];
       });
-    });
-  });
+    })
+  );
 }
 
 function getDriverStats(raceResults, participantMap) {
+  // console.log(JSON.stringify(raceResults, null, '\t'));
   let stats = _(raceResults)
   .values()
+  .filter(race => {return _.has(race, 'results'); })
   .map(race => {return race.results;})
   .reduce((drivers, curRace) => {
+    // console.log(curRace);
     curRace.forEach(driver => {
       let driverId = driver.driverId;
       if (!drivers.has(driverId)) {
@@ -273,9 +266,8 @@ function printDriverStats(driverStats) {
   // //output the ranked list of drivers
   let rankedDrivers = driverStats
   .filter(a => { return typeof a.driverSkill !== 'undefined';})
-  .sort((a,b) => {
-    return b.driverSkill - a.driverSkill;
-  });
+  .sort((a,b) => {return b.driverSkill - a.driverSkill;});
+
   rankedDrivers.forEach((driver,index) => {
     let rating = driver.driverSkill;
     console.log(`${index}\t${rating}\t${driver.starts}\t${driver.name}`);
