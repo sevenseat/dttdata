@@ -87,92 +87,86 @@ function resultCompare(r1, r2) {
 }
 
 function getRaceResults(legResults, participantMap, raceMap) {
-  let raceResults = _.chain(legResults)
-  //first get leg rankings by doing some cool sorting work
-  .sort((r1, r2) => {
-    if (r1.raceId !== r2.raceId) { return new Date(r1.start) - new Date(r2.start); }
-    if (r1.leg !== r2.leg) { return r1.leg - r2.leg; }
-    return resultCompare(r1, r2);
-  })
-  //rank the individual race legs
-  .map((curResult, index, allResults) => {
-    let rank = 1;
-    if (index !== 0) {
-      let prevResult = allResults[index - 1];
-      if ((prevResult.raceId === curResult.raceId) && (prevResult.leg === curResult.leg)) {
-        //curResult is in the same leg
-        if (resultCompare(curResult, prevResult) === 0) {
-          rank = prevResult.rank;
-        }  else {
-          rank = prevResult.rank + 1;
-        }
-      }
-    }
-    curResult.rank = rank;
-    return curResult;
-  })
+  let raceResults =
+  _.chain(legResults)
+  .groupBy('raceId')
+  .mapValues(race => {
+    // console.log(race);
+    return _.chain(race)
 
-  //then start to process it into a race result table
-  .reduce((races, curLeg) => {
-    if (!races.hasOwnProperty(curLeg.raceId)) {
-      races[curLeg.raceId] = {};
-    }
-    if (!races[curLeg.raceId].hasOwnProperty(curLeg.driverId)) {
-      races[curLeg.raceId][curLeg.driverId] = {
-        driverId: curLeg.driverId,
-        driverName: participantMap.get(curLeg.driverId).fullname,
+    ///
+    //STEP 1: RANK THE LEGS
+    //
+    .groupBy('leg')
+    .mapValues(legResults => {
+      return legResults
+      //TODO: use better ranking logic (DNF, Unkown, same time, etc)
+      .sort(resultCompare)
+      .map((result, index) => {
+        result.rank = index + 1;
+        return result;
+      });
+    })
+    .reduce((results, legResults) => { // flatten back the legs
+      results = _.concat(results, legResults);
+      return results;
+    }, [])
+
+    ///
+    //STEP 2: BUILD A RESULT TABLE FOR EACH RACE
+    //
+    .groupBy('driverId')
+    .mapValues((legs, driverId) => {
+      let driverResult = {
+        driverId: driverId,
+        driverName: participantMap.get(Number(driverId)).fullname,
         navigatorName: 'n/a',
-        duration: Moment.duration(0).toJSON(),
         rank: null,
-        legs: {},
-        dnf: false,
-        unknownTime: false
+        duration: _.reduce(legs, (duration, leg) => {
+          duration.add(Moment.duration(leg.duration));
+          return duration;
+        }, Moment.duration(0)).toJSON(),
+        legs: _.map(legs, leg =>
+          _.pick(leg, ['start','end', 'duration', 'rank', 'dnf', 'unknownTime', 'toScore'])),
+        // These two parameters are TRUE at the race level if they are true for any leg
+        dnf: _.reduce(legs, (dnf, leg) => dnf || leg.dnf, false),
+        unknownTime: _.reduce(legs, (unknownTime, leg) => unknownTime || leg.unknownTime, false),
       };
-    }
-    races[curLeg.raceId][curLeg.driverId].legs[curLeg.leg] = _.pick(curLeg,
-      ['start','end', 'duration', 'rank', 'dnf', 'unknownTime', 'toScore']);
 
-    Moment.duration(races[curLeg.raceId][curLeg.driverId].duration).add(curLeg.duration);
-    if (curLeg.dnf === true) { races[curLeg.raceId][curLeg.driverId].dnf = true; }
-    if (curLeg.unknownTime === true) { races[curLeg.raceId][curLeg.driverId].unknownTime = true; }
-    return races;
-  }, {})
-
-  //create sorted table array of results
-  .reduce((resultsMap, raceResult, raceId) => {
-    resultsMap[raceId] = _(raceResult)
-    .values() //flatten to an array
+      return driverResult;
+    })
+    //Sort the race results
     .groupBy(getResultCompare)
     .toPairs()
     .sort((g1, g2) => {return g1[0] - g2[0];})
+    //put these groups back into the result time array, adding their rank
     .reduce((prevResults, curResultGroup) => {
-      let rankedResults = _.map(curResultGroup, result => {
+      curResultGroup[1].forEach(result => {
         result.rank = prevResults.length + 1;
       });
-      return _.concatenate(prevResults, rankedResults);
-    }, []);
-    return resultsMap;
-  }, {})
-  .value();
+      // console.log(JSON.stringify(curResultGroup[1], null, '\t'));
+      return _.concat(prevResults, curResultGroup[1]);
+    }, [])
 
-  let retVal = _(Array.from(raceMap.values()))
-  .map(race => {
-    var raceDetail = _.pick(race,
+    .value();
+  })
+
+  ///
+  //STEP 3: ADD CONSOLIDATED INFORMATION ABOUT EACH RACH
+  //
+  .mapValues((results, raceId) => {
+    var raceDetail = _.pick(raceMap.get(raceId),
         ['raceId', 'name', 'theme', 'date', 'start', 'end', 'distance', 'numLegs', 'toScore']);
-    let raceId = raceDetail.raceId;
-    if (raceResults[raceId] !== undefined) {
-      let results = raceResults[raceId];
-      raceDetail.results = results;
-      raceDetail.time = results[0].duration;
-      raceDetail.winner = results[0].driverName;
-    }
+    raceDetail.results = results;
+    raceDetail.time = results[0].duration;
+    raceDetail.winner = results[0].driverName;
     return raceDetail;
   })
   .value();
 
-  // console.log(retVal);
+  // console.log(JSON.stringify(raceResults, null, '\t'));
 
-  return retVal;
+  return raceResults;
 }
 
 function getRaceList(raceResults) {
@@ -228,7 +222,7 @@ function getDriverStats(raceResults, participantMap) {
   .reduce((drivers, curRace) => {
     // console.log(curRace);
     curRace.forEach(driver => {
-      let driverId = driver.driverId;
+      let driverId = Number(driver.driverId);
       if (!drivers.has(driverId)) {
         drivers.set(driverId, {
           id: driverId,
@@ -285,7 +279,7 @@ function main() {
     let raceResults = getRaceResults(legResults, participantMap, raceMap);
     let raceList = getRaceList(raceResults, raceMap);
 
-    getScores(raceResults, participantMap);
+    //getScores(raceResults, participantMap);
 
     let driverStats = getDriverStats(raceResults, participantMap);
 
