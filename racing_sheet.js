@@ -76,13 +76,14 @@ function getLegResults(rows, raceMap) {
   return results;
 }
 
+function getResultCompare(r) {
+  if (r.dnf === true) { return Number.MAX_VALUE / 2; }
+  if (r.unknownTime === true) { return Number.MAX_VALUE; }
+  return Moment.duration(r.duration).asMilliseconds();
+}
+
 function resultCompare(r1, r2) {
-  let compareVal = (r => {
-    if (r.dnf === true) { return Number.MAX_VALUE / 2; }
-    if (r.unknownTime === true) { return Number.MAX_VALUE; }
-    return Moment.duration(r.duration).asMilliseconds();
-  });
-  return compareVal(r1) - compareVal(r2);
+  return getResultCompare(r1) - getResultCompare(r2);
 }
 
 function getRaceResults(legResults, participantMap, raceMap) {
@@ -139,22 +140,17 @@ function getRaceResults(legResults, participantMap, raceMap) {
 
   //create sorted table array of results
   .reduce((resultsMap, raceResult, raceId) => {
-    resultsMap[raceId] = _(raceResult).values()
-    .sort(resultCompare)
-    .map((result, index, prevResults) => {
-      if (index === 0) {
-        result.rank = 1;
-      } else {
-        let prevResult = prevResults[index - 1];
-        if (resultCompare(result, prevResult) === 0) {
-          result.rank = prevResult.rank;
-        } else {
-          result.rank = prevResult.rank + 1;
-        }
-      }
-      return result;
-    })
-    .value();
+    resultsMap[raceId] = _(raceResult)
+    .values() //flatten to an array
+    .groupBy(getResultCompare)
+    .toPairs()
+    .sort((g1, g2) => {return g1[0] - g2[0];})
+    .reduce((prevResults, curResultGroup) => {
+      let rankedResults = _.map(curResultGroup, result => {
+        result.rank = prevResults.length + 1;
+      });
+      return _.concatenate(prevResults, rankedResults);
+    }, []);
     return resultsMap;
   }, {})
   .value();
