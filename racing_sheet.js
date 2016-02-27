@@ -5,8 +5,6 @@
 var GoogleSpreadsheet = require('google-spreadsheet');
 var Sheet = new GoogleSpreadsheet('1LI4OBEGMPKxBwtGY_xJ1yT_G-rrCJxl8FaC0q0DaBl0');
 
-var Firebase = require('firebase');
-
 var Moment = require('moment-timezone');
 
 const TS_PATH = './node_modules/jstrueskill/lib/racingjellyfish/jstrueskill';
@@ -248,7 +246,8 @@ function main() {
     //scoreResults(raceResults, participants);
 
     console.log('Updating Firebase');
-    let fbRef = new Firebase('https://dttdata.firebaseio.com/');
+    var firebase = require('firebase');
+    let fbRef = new firebase('https://dttdata.firebaseio.com/');
     fbRef.set({
       races: raceList,
       raceResults: raceResults,
