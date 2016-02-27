@@ -246,8 +246,8 @@ function main() {
     //scoreResults(raceResults, participants);
 
     console.log('Updating Firebase');
-    var firebase = require('firebase');
-    let fbRef = new firebase('https://dttdata.firebaseio.com/');
+    var Firebase = require('firebase');
+    let fbRef = new Firebase('https://dttdata.firebaseio.com/');
     fbRef.set({
       races: raceList,
       raceResults: raceResults,
