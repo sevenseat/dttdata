@@ -1,10 +1,6 @@
 #!/usr/bin/env node
 'use strict';
 
-// spreadsheet key is the long id in the sheets URL
-var GoogleSpreadsheet = require('google-spreadsheet');
-var Sheet = new GoogleSpreadsheet('1LI4OBEGMPKxBwtGY_xJ1yT_G-rrCJxl8FaC0q0DaBl0');
-
 var Moment = require('moment-timezone');
 
 const TS_PATH = './node_modules/jstrueskill/lib/racingjellyfish/jstrueskill';
@@ -17,7 +13,7 @@ var _ = require('lodash');
 
 function getSheetRows(sheet, tab) {
   return new Promise((resolve,reject) => {
-    Sheet.getRows(tab, (err, rows) => {
+    sheet.getRows(tab, (err, rows) => {
       if (err !== null) {reject(err);}
       resolve(rows);
     });
@@ -228,6 +224,9 @@ function printDriverStats(driverStats) {
 
 function main() {
   console.log('Getting data from Google Sheets');
+  // spreadsheet key is the long id in the sheets URL
+  var GoogleSpreadsheet = require('google-spreadsheet');
+  var Sheet = new GoogleSpreadsheet('1LI4OBEGMPKxBwtGY_xJ1yT_G-rrCJxl8FaC0q0DaBl0');
   Promise.all([getSheetRows(Sheet, 1).then(getParticipants),
                getSheetRows(Sheet, 3).then(getRaces),
                getSheetRows(Sheet, 2)
