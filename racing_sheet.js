@@ -2,14 +2,19 @@
 'use strict';
 
 var Moment = require('moment-timezone');
+const SHEET_KEY = '1LI4OBEGMPKxBwtGY_xJ1yT_G-rrCJxl8FaC0q0DaBl0';
 
 const TS_PATH = './node_modules/jstrueskill/lib/racingjellyfish/jstrueskill';
-// var TrueSkillCalculator = require(`${TS_PATH}/TrueSkillCalculator`);
-var GameInfo = require(`${TS_PATH}/GameInfo`).getDefaultGameInfo();
-// var Player = require(`${TS_PATH}/Player`);
-// var Team = require(`${TS_PATH}/Team`);
+var TrueSkillCalculator = require(`${TS_PATH}/TrueSkillCalculator`);
+var Player = require(`${TS_PATH}/Player`);
+var Team = require(`${TS_PATH}/Team`);
+let GameInfo = require(`${TS_PATH}/GameInfo`).getDefaultGameInfo();
+// GameInfo.setDynamicsFactor(25 / 50);
 
 var _ = require('lodash');
+
+const DNF =       Number.MAX_SAFE_INTEGER / 2;
+const UNKNOWN =   Number.MAX_SAFE_INTEGER;
 
 function getSheetRows(sheet, tab) {
   return new Promise((resolve,reject) => {
@@ -22,6 +27,7 @@ function getSheetRows(sheet, tab) {
 
 //Participants
 function getParticipants(rows) {
+
   return _(rows)
   .map((row) => {
     return {
@@ -76,8 +82,8 @@ function getLegResults(rows, races) {
 }
 
 function getResultCompare(r) {
-  if (r.dnf === true) { return Number.MAX_VALUE / 2; }
-  if (r.unknownTime === true) { return Number.MAX_VALUE; }
+  if (r.dnf === true) { return DNF; }
+  if (r.unknownTime === true) { return UNKNOWN; }
   return Moment.duration(r.duration).asMilliseconds();
 }
 
@@ -85,7 +91,7 @@ function rankResults(results) {
   return _(results)
   .groupBy(getResultCompare)
   .toPairs()
-  .sortBy('0')
+  .sortBy(result => Number(result[0]))
   //put these groups back into the result time array, adding their rank
   .reduce((prevResults, curResultGroup) => {
     curResultGroup[1].forEach(result => {
@@ -95,8 +101,67 @@ function rankResults(results) {
   }, []);
 }
 
+function scoreLeg(legResults, participants) {
+
+  //HACK: this doesn't actually impact the legResults the results are put
+  //in the particpant data.  That feels like poor practice to me, but, eh....
+
+  console.log(`Scoring ${legResults[0].raceId}, Leg ${legResults[0].leg}`);
+
+  if (legResults.length < 2) {return;}
+
+  let skillData = _(legResults)
+  .reject('unknownTime')
+  .reduce((results, legResult) => {
+    let driverId = legResult.driverId;
+    results.driverIds.push(driverId);
+    results.teams.push(new Team(driverId.toString(),
+                       new Player(driverId),
+                       participants[driverId].driverSkill));
+    results.ranks.push(legResult.rank);
+
+    if (driverId === 57) {
+      console.log(`Rank: ${legResult.rank}`);
+    }
+    return results;
+  }, {driverIds: [], teams: [], ranks: []});
+
+  let newSkills;
+  let ratingsCalculated = false;
+  while (!ratingsCalculated) {
+    try {
+      newSkills = TrueSkillCalculator.calculateNewRatings(GameInfo,
+                  skillData.teams, skillData.ranks);
+      ratingsCalculated = true;
+    } catch (err) {
+      /*jshint loopfunc: true */
+      let lastRanking = _.last(skillData.ranks);
+      let indexToChange = _.findLastIndex(skillData.ranks, rank => rank !== lastRanking);
+      skillData.ranks[indexToChange] = lastRanking;
+      let driverName = participants[skillData.driverIds[indexToChange]].fullname;
+      console.error(`SCORING ERROR: Changing the rating of: ${driverName}`);
+    }
+  }
+  skillData.teams.forEach(team => {
+    let player = team.getPlayers()[0];
+    participants[player.getId()].driverSkill = newSkills[player];
+    if (Number(player.getId()) === 57) {
+      console.log(JSON.stringify(newSkills[player]));
+    }
+
+  });
+
+  return legResults;
+}
+
 function getRaceResults(legResults, participants, races) {
   return _.chain(legResults)
+
+  // HACK: puts the  legs date order...  so that we score the race results in Date
+  // order (needed for Trueskill).  I couldn't figure out how to order the grouping
+  // below....
+  .sortBy(leg => races[leg.raceId].date)
+
   .groupBy('raceId')
   .mapValues(race => {
     // console.log(race);
@@ -106,7 +171,9 @@ function getRaceResults(legResults, participants, races) {
     //STEP 1: RANK THE LEGS
     //
     .groupBy('leg') //groups the results by eaech leg
-    .flatMap(rankResults) //ranks each leg
+    .mapValues(rankResults) //ranks each leg
+    .flatMap(legs => scoreLeg(legs, participants))
+    // .flatten()
 
     ///
     //STEP 2: BUILD A RESULT TABLE FOR EACH RACE
@@ -136,7 +203,6 @@ function getRaceResults(legResults, participants, races) {
   })
   //Rank the race results
   .mapValues(rankResults)
-
   ///
   //STEP 3: ADD CONSOLIDATED INFORMATION ABOUT EACH RACE
   //
@@ -160,39 +226,6 @@ function getRaceList(raceResults) {
   .value();
 }
 
-// function scoreResults(raceResults, participantMap) {
-//
-//   let retVal = _(raceResults)
-//   .mapValues('results')
-//   .value();
-//
-//   console.log(retVal);
-//   return;
-//
-//   console.log(legResults[0].raceId + ' ' + legResults[0].leg);
-//
-//   if (legResults.length < 2) {return;}
-//
-//   let skillData = _(legResults)
-//   .filter(legResult => (legResult.unknownTime === false))
-//   .reduce((results, legResult) => {
-//     let driverId = legResult.driverId;
-//     results.teams.push(new Team(driverId.toString(),
-//                        new Player(driverId),
-//                        participantMap.get(driverId).driverSkill));
-//     results.ranks.push(legResult.rank);
-//     return results;
-//   }, {teams: [], ranks: []});
-//
-//   let newSkills = TrueSkillCalculator.calculateNewRatings(GameInfo,
-//                   skillData.teams, skillData.ranks);
-//
-//   skillData.teams.forEach(team => {
-//     let player = team.getPlayers()[0];
-//     participantMap.get(player.getId()).driverSkill = newSkills[player];
-//   });
-// }
-
 function getDriverStats(raceResults, participants) {
 
   return _(raceResults)
@@ -206,17 +239,16 @@ function getDriverStats(raceResults, participants) {
       finishes: _.filter(driverResults, result => result.dnf === false).length,
       wins: _.filter(driverResults, result => result.rank === 1).length,
       podiums: _.filter(driverResults, result => result.rank <= 3).length,
-      driverSkill: participants[driverId].driverSkill.conservativeRating.toFixed(2)
+      driverSkill: _.round(participants[driverId].driverSkill.conservativeRating, 2)
     };
   })
-  .orderBy('wins', 'desc')
+  .orderBy('driverSkill', 'desc')
   .value();
 }
 
 //output the ranked list of drivers
 function printDriverStats(driverStats) {
   _(driverStats)
-  .sortBy('driverSkill')
   .forEach((driver, index) => {
     console.log(`${index}\t${driver.driverSkill}\t${driver.starts}\t${driver.name}`);
   });
@@ -226,7 +258,8 @@ function main() {
   console.log('Getting data from Google Sheets');
   // spreadsheet key is the long id in the sheets URL
   var GoogleSpreadsheet = require('google-spreadsheet');
-  var Sheet = new GoogleSpreadsheet('1LI4OBEGMPKxBwtGY_xJ1yT_G-rrCJxl8FaC0q0DaBl0');
+  var Sheet = new GoogleSpreadsheet(SHEET_KEY);
+
   Promise.all([getSheetRows(Sheet, 1).then(getParticipants),
                getSheetRows(Sheet, 3).then(getRaces),
                getSheetRows(Sheet, 2)

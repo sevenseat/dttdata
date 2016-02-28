@@ -57,7 +57,7 @@
 
         grid.addColumn({name: 'rank'});
         grid.addColumn({name: 'driverName'});
-        for (let leg = 1; leg <= this._results.numLegs; leg++) {
+        for (let leg = 0; leg < this._results.numLegs; leg++) {
           grid.addColumn({name: `legs.${leg}.start`});
           grid.columns[grid.columns.length - 1].renderer = this._timeRenderer;
           grid.addColumn({name: `legs.${leg}.end`});
@@ -65,7 +65,7 @@
           grid.addColumn({name: `legs.${leg}.duration`});
           grid.columns[grid.columns.length - 1].renderer = this._durationRenderer;
           grid.addColumn({name: `legs.${leg}.rank`});
-          header1 = header1.concat(`Leg ${leg}`, '', '', '');
+          header1 = header1.concat(`Leg ${leg + 1}`, '', '', '');
           header2 = header2.concat('Start', 'End', 'Duration', 'Rank');
         }
         grid.addColumn({name: 'duration'});
