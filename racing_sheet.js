@@ -9,7 +9,6 @@ var TrueSkillCalculator = require(`${TS_PATH}/TrueSkillCalculator`);
 var Player = require(`${TS_PATH}/Player`);
 var Team = require(`${TS_PATH}/Team`);
 let GameInfo = require(`${TS_PATH}/GameInfo`).getDefaultGameInfo();
-// GameInfo.setDynamicsFactor(25 / 50);
 
 var _ = require('lodash');
 
@@ -27,7 +26,6 @@ function getSheetRows(sheet, tab) {
 
 //Participants
 function getParticipants(rows) {
-
   return _(rows)
   .map((row) => {
     return {
@@ -173,7 +171,6 @@ function getRaceResults(legResults, participants, races) {
     .groupBy('leg') //groups the results by eaech leg
     .mapValues(rankResults) //ranks each leg
     .flatMap(legs => scoreLeg(legs, participants))
-    // .flatten()
 
     ///
     //STEP 2: BUILD A RESULT TABLE FOR EACH RACE
