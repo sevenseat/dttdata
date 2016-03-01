@@ -8,7 +8,12 @@ const TS_PATH = './node_modules/jstrueskill/lib/racingjellyfish/jstrueskill';
 var TrueSkillCalculator = require(`${TS_PATH}/TrueSkillCalculator`);
 var Player = require(`${TS_PATH}/Player`);
 var Team = require(`${TS_PATH}/Team`);
-let GameInfo = require(`${TS_PATH}/GameInfo`).getDefaultGameInfo();
+let GameInfo = new(require(`${TS_PATH}/GameInfo`))
+      (25.0,           // Mean for new players (Default: 25)
+       25.0 / 3.0,     //Standard deviatation  for new players (Defualt: Mean/3)
+       25.0 / 2.0,     //Beta - Number of skill points for 80% chance to win (Default: Mean/6)
+       25.0 / 150.0,   //Tau - amount added to a user's SD before each match (Default: Mean/300)
+       0.1);           //Draw probability (changing this caused the algorithm to fail more freq.)
 
 var _ = require('lodash');
 
@@ -118,7 +123,7 @@ function scoreLeg(legResults, participants) {
                        participants[driverId].driverSkill));
     results.ranks.push(legResult.rank);
 
-    if (driverId === 57) {
+    if (driverId === 68) {
       console.log(`Rank: ${legResult.rank}`);
     }
     return results;
@@ -143,7 +148,7 @@ function scoreLeg(legResults, participants) {
   skillData.teams.forEach(team => {
     let player = team.getPlayers()[0];
     participants[player.getId()].driverSkill = newSkills[player];
-    if (Number(player.getId()) === 57) {
+    if (Number(player.getId()) === 68) {
       console.log(JSON.stringify(newSkills[player]));
     }
 
@@ -153,6 +158,11 @@ function scoreLeg(legResults, participants) {
 }
 
 function getRaceResults(legResults, participants, races) {
+  console.log(legResults.length);
+  console.log(_(legResults).groupBy(r => {
+    return `${r.raceId} ${r.leg} ${getResultCompare(r)}`;
+  }).keys().value().length);
+
   return _.chain(legResults)
 
   // HACK: puts the  legs date order...  so that we score the race results in Date
