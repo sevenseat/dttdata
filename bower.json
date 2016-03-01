@@ -2,7 +2,6 @@
   "name": "dttdata",
   "private": true,
   "dependencies": {
-    "firebase": "~2.3.2",
     "firebase-element": "GoogleWebComponents/firebase-element#~1.0.9",
     "iron-elements": "PolymerElements/iron-elements#^1.0.0",
     "moment": "^2.11.2",
@@ -12,13 +11,11 @@
     "paper-elements": "PolymerElements/paper-elements#^1.0.1",
     "platinum-elements": "PolymerElements/platinum-elements#^1.1.0",
     "polymer": "Polymer/polymer#^1.2.0",
-    "vaadin-grid": "^1.0.0",
+    "vaadin-grid": "^1.0.0"
   },
   "devDependencies": {
+    "firebase": "~2.3.2",
     "web-component-tester": "*"
   },
-  "ignore": [],
-  "resolutions": {
-    "paper-styles": "^1.1.0"
-  }
+  "ignore": []
 }
