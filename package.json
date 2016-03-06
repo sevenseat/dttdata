@@ -35,7 +35,6 @@
     "merge-stream": "^1.0.0",
     "require-dir": "^0.3.0",
     "run-sequence": "^1.0.2",
-    "trueskill": "0.0.2",
     "vulcanize": ">= 1.4.2",
     "web-component-tester": "^4.0.0"
   },
