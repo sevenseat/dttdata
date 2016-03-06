@@ -1,0 +1,24 @@
+{
+  "extends": "google",
+  "rules": {
+    "no-console": 0,
+    "require-jsdoc": 0,
+    "no-var": 1,
+    "prefer-const": 1,
+    "prefer-arrow-callback": 1
+  },
+  "env": {
+    "browser": true
+  },
+  "plugins": [
+    "html"
+  ],
+  "globals": {
+    "__dirname": false,
+    "app": false,
+    "page": false,
+    "Polymer": false,
+    "process": false,
+    "require": false
+  }
+}
