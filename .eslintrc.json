@@ -4,7 +4,7 @@
     "no-console": 0,
     "require-jsdoc": 0,
     "no-var": 1,
-    "prefer-const": 1,
+    /*"prefer-const": 1,*/
     "prefer-arrow-callback": 1
   },
   "env": {
